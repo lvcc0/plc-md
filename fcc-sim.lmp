@@ -1,0 +1,22 @@
+# initialization
+units metal
+dimension 3
+atom_style atomic
+boundary p p p
+
+# system definition
+pair_style eam
+read_data min.data
+pair_coeff * * Al_jnp.eam
+
+# monitoring
+thermo 1000
+thermo_style custom step temp pe ke etotal press
+
+dump mydump all atom 100 dump.lammpstrj
+
+# run
+fix mynve all nve
+fix mylgv all langevin 1.0 1.0 0.1 1337
+timestep 0.005
+run 15000

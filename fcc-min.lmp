@@ -1,0 +1,30 @@
+# https://knowhowspot.blog/lammps-perfect-crystal-guide
+
+# initialization
+units metal
+dimension 3
+atom_style atomic
+boundary p p p
+
+# defining face-centered cubic lattice with a lattice constant of Al.
+# lattice constant - physical distance between unit cells in a crystal lattice,
+# which defines the size of unit cell.
+lattice fcc 4.05
+
+# creating the simulation box
+region box block 0 10 0 10 0 10
+create_box 1 box
+create_atoms 1 box
+
+# some settings
+mass 1 26.981539 # Al mass
+pair_style eam # embedded alloy method
+pair_coeff * * Al_jnp.eam
+
+# minimizing energy
+neighbor 2.0 bin
+neigh_modify every 20 delay 0 check no
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# save system after energy minimization
+write_data min.data

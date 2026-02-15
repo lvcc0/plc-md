@@ -1,0 +1,6 @@
+# lammps stuff
+*.lammpstrj
+*.data
+
+# docs stuff
+*.odt#
