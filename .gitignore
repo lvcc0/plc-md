@@ -1,6 +1,6 @@
-# lammps stuff
 *.lammpstrj
 *.data
+*.ovito
 
-# docs stuff
+*.odt
 *.odt#
