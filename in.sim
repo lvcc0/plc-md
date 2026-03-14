@@ -1,8 +1,7 @@
 include common.ini
 
-# system definition
-pair_style eam
 read_data min.data
+pair_style eam
 pair_coeff * * Al_jnp.eam
 
 variable xx equal ${box_size} / 2 * ${dx}
@@ -16,14 +15,16 @@ region top_half  block INF INF  INF INF  v_zz INF
 region plane_region intersect 3 plane_in plane_out top_half
 delete_atoms region plane_region compress yes
 
-# monitoring
-thermo 100
-thermo_style custom step temp pe ke etotal press
+thermo 200
+thermo_style custom step temp pe etotal press fmax
 
-dump mydump all atom 50 dump.lammpstrj
-
-# run
-fix mynve all nve
-fix mylgv all langevin 1.0 1.0 0.1 1337
+min_style cg
 timestep 0.005
-run 3000
+
+fix mynve      all nve
+fix mylangevin all langevin 300.0 300.0 0.1 1337
+
+dump mydump all atom 100 dump.lammpstrj
+
+minimize 1.0e-6 1.0e-8 10000 100000
+run 50000
