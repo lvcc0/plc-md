@@ -1,5 +1,7 @@
+*.lammps
 *.lammpstrj
 *.data
+*.atom
 *.ovito
 
 *.odt
