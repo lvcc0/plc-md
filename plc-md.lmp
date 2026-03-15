@@ -59,7 +59,6 @@ region top_half  block INF INF  INF INF  v_zhalf INF
 region plane_region intersect 3 plane_in plane_out top_half
 delete_atoms region plane_region
 
-
 # NOTE: is it really real? is this physically accurate?
 # accounting for the ABAB fcc structure*
 #region edge_plane block INF 0.2  INF INF  INF INF
@@ -71,14 +70,23 @@ delete_atoms region plane_region
 
 change_box all z delta 0 10 units box  # adding some space above
 
-# --- simulation --- #
+# --- simulation & saving the data --- #
 
-write_data pre.data
+# create "dumps/" directory if it doesn't exist
+shell mkdir dumps
+
+write_data dumps/!pre.data  # pre-relaxation state (first frame)
 
 thermo        10
 thermo_style  custom step pe etotal pxx pyy pzz
 
-dump mydump all atom 10 dump.atom
-minimize 1e-25 1e-25 10000 5000
+# getting datetime data for naming the dump file
+shell date +%Y-%m-%d_%H-%M > date.tmp
+variable timestamp file date.tmp
+shell rm date.tmp
 
-write_data post.data
+dump fulldump all atom 10 dumps/dump.${timestamp}.atom
+minimize 1e-25 1e-25 10000 5000
+run 0
+
+write_data dumps/!post.data  # post-relaxation state (last frame)
