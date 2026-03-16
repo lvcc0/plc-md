@@ -4,9 +4,9 @@
 variable a equal 4.05
 
 # box length in each dimension (in lattice spacings)
-variable xlen equal 42  # along [1 -1  0]
-variable ylen equal 6   # along [1  1 -2]
-variable zlen equal 18  # along [1  1  1]
+variable xlen index 48  # along [1 -1  0]
+variable ylen index 6   # along [1  1 -2]
+variable zlen index 24  # along [1  1  1]
 
 # lattice spacing (from logs)
 variable dx equal 5.7275649
@@ -81,11 +81,13 @@ thermo        10
 thermo_style  custom step pe etotal pxx pyy pzz
 
 # getting datetime data for naming the dump file
-shell date +%Y-%m-%d_%H-%M > date.tmp
-variable timestamp file date.tmp
-shell rm date.tmp
+if "$(is_defined(variable, dump_name) == 0)" then &
+  "shell date +%Y-%m-%d_%H-%M > date.tmp" &
+  "variable timestamp file date.tmp" &
+  "shell rm date.tmp" &
+  "variable dump_name equal dumps/dump.${timestamp}.atom"
 
-dump fulldump all atom 10 dumps/dump.${timestamp}.atom
+dump fulldump all atom 10 ${dump_name}
 minimize 1e-25 1e-25 10000 5000
 run 0
 

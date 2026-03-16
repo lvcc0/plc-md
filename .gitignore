@@ -1,8 +1,9 @@
 *.lammps
-*.lammpstrj
-*.data
-*.atom
 *.ovito
 
+*.mp4
 *.odt
 *.odt#
+
+venv/
+dumps/
