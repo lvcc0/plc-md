@@ -4,7 +4,7 @@
 variable a equal 4.05
 
 # box length in each dimension (in lattice spacings)
-variable xlen index 48  # along [1 -1  0]
+variable xlen index 24  # along [1 -1  0]
 variable ylen index 6   # along [1  1 -2]
 variable zlen index 24  # along [1  1  1]
 
@@ -14,10 +14,25 @@ variable dy equal 6.6136223
 variable dz equal 7.0148058
 
 # burgers vector
-# NOTE: idrk if this is the right formula :)
-variable b equal $a/${dx}
+# todo: check this
+variable b equal $a/${dx}/2
+
+# getting datetime data for naming the dump file
+if "$(is_defined(variable, dump_name) == 0)" then &
+  "shell date +%Y-%m-%d_%H-%M > date.tmp" &
+  "variable timestamp file date.tmp" &
+  "shell rm date.tmp" &
+  "variable dump_name index ${xlen}x${ylen}x${zlen}.${timestamp}"
 
 # --- general settings --- #
+
+# create directories if they don't exist
+shell mkdir logs
+shell mkdir dumps
+
+# logging results
+log logs/${dump_name}.log
+shell rm log.lammps
 
 units       metal
 dimension   3
@@ -37,11 +52,10 @@ region simbox block 0 ${xlen} &
 create_box    1 simbox
 create_atoms  1 region simbox
 
-# --- EAM potential --- #
+# --- eam/alloy potential --- #
 
-mass        1 26.981539 # Al mass
-pair_style  eam
-pair_coeff  * * Al_jnp.eam
+pair_style  eam/alloy
+pair_coeff  * * potentials/NiAl_Mishin_2004.eam.alloy Al
 
 neighbor      2.0 bin
 neigh_modify  delay 5
@@ -59,36 +73,23 @@ region top_half  block INF INF  INF INF  v_zhalf INF
 region plane_region intersect 3 plane_in plane_out top_half
 delete_atoms region plane_region
 
-# NOTE: is it really real? is this physically accurate?
-# accounting for the ABAB fcc structure*
-#region edge_plane block INF 0.2  INF INF  INF INF
-#delete_atoms region edge_plane
-
-# *by deleting a single plane of atoms, we disrupted ABAB fcc structure
-#  so now we have to delete another one whole plane for balancing it out.
-#  or so i think :)
-
 change_box all z delta 0 10 units box  # adding some space above
 
 # --- simulation & saving the data --- #
-
-# create "dumps/" directory if it doesn't exist
-shell mkdir dumps
 
 write_data dumps/!pre.data  # pre-relaxation state (first frame)
 
 thermo        10
 thermo_style  custom step pe etotal pxx pyy pzz
 
-# getting datetime data for naming the dump file
-if "$(is_defined(variable, dump_name) == 0)" then &
-  "shell date +%Y-%m-%d_%H-%M > date.tmp" &
-  "variable timestamp file date.tmp" &
-  "shell rm date.tmp" &
-  "variable dump_name equal dumps/dump.${timestamp}.atom"
+dump fulldump all atom 10 dumps/${dump_name}.atom
 
-dump fulldump all atom 10 ${dump_name}
+# energy minimization
 minimize 1e-25 1e-25 10000 5000
-run 0
+
+# running after minimization
+fix mynve all nve
+timestep 0.01
+run 500
 
 write_data dumps/!post.data  # post-relaxation state (last frame)

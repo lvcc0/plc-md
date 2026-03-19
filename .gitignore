@@ -1,9 +1,9 @@
-*.lammps
-*.ovito
+logs/
+dumps/
+results/
 
 *.mp4
 *.odt
 *.odt#
 
 venv/
-dumps/
