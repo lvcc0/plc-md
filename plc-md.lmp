@@ -4,9 +4,9 @@
 variable a equal 4.05
 
 # box length in each dimension (in lattice spacings)
-variable xlen index 24  # along [1 -1  0]
+variable xlen index 12  # along [1 -1  0]
 variable ylen index 6   # along [1  1 -2]
-variable zlen index 24  # along [1  1  1]
+variable zlen index 12  # along [1  1  1]
 
 # lattice spacing (from logs)
 variable dx equal 5.7275649
@@ -14,15 +14,15 @@ variable dy equal 6.6136223
 variable dz equal 7.0148058
 
 # burgers vector
-# todo: check this
 variable b equal $a/${dx}/2
 
-# getting datetime data for naming the dump file
+# getting datetime data for naming the dump & log files
 if "$(is_defined(variable, dump_name) == 0)" then &
   "shell date +%Y-%m-%d_%H-%M > date.tmp" &
   "variable timestamp file date.tmp" &
   "shell rm date.tmp" &
-  "variable dump_name index ${xlen}x${ylen}x${zlen}.${timestamp}"
+  "variable dump_name index dumps/${xlen}x${ylen}x${zlen}.${timestamp}.atom" &
+  "variable log_name  index logs/${xlen}x${ylen}x${zlen}.${timestamp}.log"
 
 # --- general settings --- #
 
@@ -31,7 +31,7 @@ shell mkdir logs
 shell mkdir dumps
 
 # logging results
-log logs/${dump_name}.log
+log ${log_name}
 shell rm log.lammps
 
 units       metal
@@ -77,19 +77,43 @@ change_box all z delta 0 10 units box  # adding some space above
 
 # --- simulation & saving the data --- #
 
-write_data dumps/!pre.data  # pre-relaxation state (first frame)
+#write_data dumps/!start.data  # pre relaxation state (first frame)
 
 thermo        10
 thermo_style  custom step pe etotal pxx pyy pzz
 
-dump fulldump all atom 10 dumps/${dump_name}.atom
+dump fulldump all atom 10 ${dump_name}
 
 # energy minimization
 minimize 1e-25 1e-25 10000 5000
 
-# running after minimization
-fix mynve all nve
-timestep 0.01
-run 500
+#write_data dumps/!relaxed.data  # post relaxation state
 
-write_data dumps/!post.data  # post-relaxation state (last frame)
+# --- rigid shift --- #
+
+compute zmax all reduce max z
+
+# initialize the system for computes to compute
+run 0
+
+variable z_top_thresh equal "c_zmax - 2.5"
+variable z_bot_thresh equal 2.0
+
+variable is_top atom "z > v_z_top_thresh"
+variable is_bot atom "z < v_z_bot_thresh"
+
+group top_layer variable is_top
+group bot_layer variable is_bot
+group mid_layer subtract all top_layer bot_layer
+
+variable shift equal 8 # Angst/ps 
+
+fix top_move top_layer move variable NULL NULL NULL  v_shift NULL NULL
+fix top_frz  top_layer setforce 0.0 0.0 0.0
+
+fix mid_nvt mid_layer nvt temp 300.0 300.0 0.1
+fix bot_frz bot_layer setforce 0.0 0.0 0.0
+
+run 2000
+
+#write_data dumps/!shifted.data  # post shifting state
