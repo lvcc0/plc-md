@@ -1,0 +1,124 @@
+# this file gets relaxed system with a dislocation in the middle as input.
+
+include common.lmp
+
+# if restart file name is not given, get the last modified one
+if "$(is_defined(variable, restart_file) == 0)" then &
+  "shell ls -t restarts/dislocations | head -1 > restart_file.tmp" &
+  "variable restart_file file restart_file.tmp" &
+  "shell rm restart_file.tmp"
+
+read_restart restarts/dislocations/${restart_file}
+
+# getting datetime data for naming files
+if "$(is_defined(variable, file_name) == 0)" then &
+  "shell date +%Y-%m-%d_%H-%M > timestamp.tmp" &
+  "variable timestamp file timestamp.tmp" &
+  "shell rm timestamp.tmp" &
+  "variable file_name string shear.${xlen}x${ylen}x${zlen}.${timestamp}"
+
+# --- general settings --- #
+
+# create directories if they don't exist
+shell mkdir logs/shears
+shell mkdir dumps/shears
+shell mkdir dumps/equilibrations
+
+# logging results
+log logs/shears/${file_name}.log
+shell rm log.lammps
+
+pair_style eam/alloy
+pair_coeff * * potentials/NiAl_Mishin_2004.eam.alloy Al
+
+# --- variables --- #
+
+compute zmax all reduce max z
+
+# initialize the system for computes to compute
+run 0
+
+variable z_top_thresh equal "c_zmax - 2.5"
+variable z_bot_thresh equal 2.0
+
+variable is_top atom "z > v_z_top_thresh"
+variable is_bot atom "z < v_z_bot_thresh"
+
+group top_layer variable is_top
+group bot_layer variable is_bot
+group mobile subtract all top_layer bot_layer
+
+# ---                                   --- #
+# --- STEP 1: temperature equilibration --- #
+# ---                                   --- #
+
+timestep 0.001  # 1e-12 * 1e-3 = 1e-15
+reset_timestep 0
+
+compute pot_energy all pe/atom
+compute stress all stress/atom NULL
+
+# define temperature
+compute mobile_temp mobile temp
+
+# initialize atom velocities
+velocity mobile create ${desired_temp} 54321 units box
+velocity mobile zero linear
+velocity mobile zero angular
+
+# equilibrate the temperature
+fix 1 mobile nve
+fix 2 mobile temp/rescale 1 ${desired_temp} ${desired_temp} 1.0 0.5
+fix_modify 2 temp mobile_temp
+
+# boundary conditions
+fix 3 top_layer setforce NULL 0.0 0.0
+fix 4 bot_layer setforce NULL 0.0 0.0
+
+thermo 100
+thermo_modify temp mobile_temp
+
+thermo_style custom step pe ke temp pxx pyy pzz pxy pyz pxz
+dump equildump all custom 100 dumps/equilibrations/${file_name}.atom id x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
+
+run ${temperature_equil_time}
+
+# ---                                                                --- #
+# --- STEP 2: apply constant force to calculate dislocation velocity --- #
+# ---                                                                --- #
+
+timestep 0.002
+
+unfix 1
+unfix 2
+unfix 3
+unfix 4
+undump equildump
+uncompute mobile_temp
+reset_timestep 0
+
+variable ntop equal count(top_layer)  # number of atoms in top layer
+
+variable shearforce equal v_sigma*(v_xlen*v_ylen*v_dx*v_dy)/(v_ntop*v_eV_to_J)
+
+# define temperature
+compute mobile_temp mobile temp
+
+# define boundary velocities
+velocity top_layer set 0.0 0.0 0.0 units box
+velocity bot_layer set 0.0 0.0 0.0 units box
+
+# define boundary conditions
+fix 1 top_layer setforce NULL NULL 0.0
+fix 2 bot_layer setforce NULL 0.0  0.0
+fix 3 top_layer aveforce ${shearforce} 0.0 0.0
+fix 4 top_layer rigid group 1 top_layer
+
+fix 5 mobile nve
+
+thermo 100
+thermo_modify temp mobile_temp
+
+dump 1 all custom 500 dumps/shears/${file_name}.atom id x y z
+
+run ${shear_run_time}
