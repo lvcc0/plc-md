@@ -1,0 +1,97 @@
+include common.ini
+
+# getting datetime data for naming files
+if "$(is_defined(variable, file_name) == 0)" then &
+  "shell date +%Y-%m-%d_%H-%M > timestamp.tmp"    &
+  "variable timestamp file timestamp.tmp"         &
+  "shell rm timestamp.tmp"                        &
+  "variable file_name string equilibration.${timestamp}"
+
+variable atom_file string atoms.fcc.edge.pad
+read_data ${atom_file}
+
+# --- general settings --- #
+
+# logging results
+log logs/equilibrations/${file_name}.log
+shell rm log.lammps
+
+pair_style eam/alloy
+pair_coeff * * ${potential_al} Al
+
+# --- variables --- #
+ 
+region top_region block INF                  INF &
+                        $(ly-v_layer_thresh) INF &
+                        INF                  INF units box
+
+region bot_region block INF INF            &
+                        INF v_layer_thresh &
+                        INF INF            units box
+
+group top_layer region top_region                # mobile rigid top layer 
+group bot_layer region bot_region                # static rigid bottom layer
+group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
+
+# ---                                --- #
+# --- STEP 1: minimize system energy --- #
+# ---                                --- #
+
+# 1e-12 * 1e-2 = 1e-14 sec
+timestep 0.01
+
+compute pot_energy all pe/atom
+compute stress     all stress/atom NULL
+
+fix 1 top_layer setforce 0.0 0.0 NULL
+fix 2 bot_layer setforce 0.0 0.0 NULL
+
+print "###                   ###"
+print "## energy minimization ##"
+print "###                   ###"
+
+minimize 0.0 1.0e-8 10000 100000
+
+# ---                                   --- #
+# --- STEP 2: temperature equilibration --- #
+# ---                                   --- #
+
+# 1e-12 * 1e-3 = 1e-15 sec
+timestep 0.001
+
+unfix 1
+unfix 2
+reset_timestep 0
+
+# define temperature
+compute mobile_temp mobile temp
+
+# initialize atom velocities
+velocity mobile create ${desired_temp} 54321 units box
+velocity mobile zero   linear
+velocity mobile zero   angular
+
+# equilibrate the temperature
+fix 1 mobile nve
+fix 2 mobile temp/rescale 1 ${desired_temp} ${desired_temp} 1.0 0.5
+fix_modify 2 temp mobile_temp
+
+# boundary conditions
+fix 3 top_layer setforce 0.0 0.0 NULL
+fix 4 bot_layer setforce 0.0 0.0 NULL
+
+thermo        100
+thermo_modify temp mobile_temp
+thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
+
+dump 1 all custom 100                       &
+     dumps/equilibrations/${file_name}.atom &
+     id x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
+
+print "###                         ###"
+print "## temperature equilibration ##"
+print "###                         ###"
+
+run ${equilibration_run_steps}
+
+write_restart restarts/equilibrations/${file_name}.restart
