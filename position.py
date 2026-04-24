@@ -1,7 +1,7 @@
-import argparse
 import time
 import csv
 import numpy as np
+from argparse import ArgumentParser
 from pathlib import Path
 
 from ovito.io import import_file
@@ -13,14 +13,14 @@ from ovito.modifiers import PolyhedralTemplateMatchingModifier, \
 if __name__ == '__main__':
 
     """
-    STEP 0: parse script args
+    STEP 0: parse script arguments
     """
 
-    parser = argparse.ArgumentParser(description="OVITO dislocation mobility analysis")
+    parser = ArgumentParser(description='OVITO dislocation mobility analysis')
 
     # it is kinda crucial for you to provide dump file name for calculations
-    parser.add_argument('--input', type=str, required=True, help='relative path to the input LAMMPS dump file')
-    parser.add_argument('--output', type=str, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
+    parser.add_argument('-i', '--input', type=str, required=True, help='relative path to the input LAMMPS dump file')
+    parser.add_argument('-o', '--output', type=str, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
 
     args = parser.parse_args()
 
