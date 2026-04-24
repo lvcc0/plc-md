@@ -1,0 +1,138 @@
+import argparse
+import time
+import csv
+import numpy as np
+from pathlib import Path
+
+from ovito.io import import_file
+from ovito.modifiers import PolyhedralTemplateMatchingModifier, \
+                            ExpressionSelectionModifier, \
+                            DeleteSelectedModifier
+
+
+if __name__ == '__main__':
+
+    """
+    STEP 0: parse script args
+    """
+
+    parser = argparse.ArgumentParser(description="OVITO dislocation mobility analysis")
+
+    # it is kinda crucial for you to provide dump file name for calculations
+    parser.add_argument('--input', type=str, required=True, help='relative path to the input LAMMPS dump file')
+    parser.add_argument('--output', type=str, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
+
+    args = parser.parse_args()
+
+    """
+    STEP 1: isolate dislocation structure
+
+    with the use of the following modifiers we are getting non-FCC atom structures,
+    so we can leave out only dislocation (basically the only non-FCC) structure.
+    """
+
+    # import file
+    # LAMMPS dump columns: id x y z ix iy iz
+    pipeline = import_file(args.input, columns=[
+        'Particle Identifier',
+        'Position.X', 'Position.Y', 'Position.Z'
+    ])
+
+    # 1. selecting middle horizontal layer of the cell for PTM to calculate faster (limiting calculation zone)
+    zone_selection_mod = ExpressionSelectionModifier(
+        expression='Position.Y < CellSize.Y * 0.5 + %f && Position.Y > CellSize.Y * 0.5 - %f' % (16.0, 16.0)
+    )
+    pipeline.modifiers.append(zone_selection_mod)
+
+    # 2. add PTM modifier to highlight non-FCC parts of the cell structure (dislocation)
+    ptm_mod = PolyhedralTemplateMatchingModifier(
+        only_selected=True
+    )
+    pipeline.modifiers.append(ptm_mod)
+
+    # 3. select unwanted atoms
+    selection_mod = ExpressionSelectionModifier(
+        expression='StructureType == "FCC" || Position.Y < CellSize.Y * 0.5 - %f || Position.Y > CellSize.Y * 0.5 + %f' % (10.0, 10.0)
+    )
+    pipeline.modifiers.append(selection_mod)
+
+    # 4. delete selected atoms
+    delete_mod = DeleteSelectedModifier()
+    pipeline.modifiers.append(delete_mod)
+
+    """
+    STEP 2: get dislocation position at each moment of time and save each frame data in an external csv file for further analysis
+    """
+
+    # create directory for calculation results
+    output_dir = Path('results/mobility')
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # if output file name is not provided, make it "input stem".csv and place it in ./results/mobility
+    output_file = args.output if args.output else Path(args.input).stem + '.csv'
+    output_file = output_dir / Path(output_file)
+
+    # rename with a number ("file_(n).csv") if file exists
+    counter = 1
+    while output_file.exists():
+        output_file = output_file.with_name(output_file.stem.replace(f'_({counter - 1})', '') + f'_({counter}){output_file.suffix}')
+        counter += 1
+    
+    start_time = time.time()
+    total_frames = pipeline.num_frames
+
+    # initial data
+    data_init = pipeline.compute(0)
+    positions_init = data_init.particles['Position'][:, 0]
+    core_spread_init = np.max(positions_init) - np.min(positions_init)
+
+    lx = data_init.cell[0, 0] # cell's X-length 
+    ix = 0                    # imaging coefficient (to move dislocation's atoms ix * lx to the right after periodic adjustments)
+    
+    periodic_flag = False # was there a periodic adjustment?
+
+    print(f'Total frames to calculate: {total_frames}\n')
+
+    with open(output_file, mode='w', newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(['t', 'x'])
+
+        # NOTE: "timesteps" are not actual "time elapsed" but calculation steps,
+        #       so for actual physical time you should see "timestep" command in
+        #       input LAMMPS script that generated used dump input file.
+
+        # NOTE: this loop structure automatically computes each frame
+        for frame, data in enumerate(pipeline.frames):
+            timestep = data.attributes['Timestep']       # current frame timestep
+            positions = data.particles_.positions_[:, 0] # all atom X-coordinates (modifiable/mutable)
+            
+            core_spread = np.max(positions) - np.min(positions)
+
+            # take periodic movement into account
+            if np.any(positions < core_spread_init * 2.0) and core_spread > core_spread_init * 2.0:
+                if not periodic_flag:
+                    periodic_flag = True
+
+                # move all the atoms that "teleported" to the left one lx to the right (make dislocation structure whole)
+                positions[positions < core_spread_init * 2.0] = positions[positions < core_spread_init * 2.0] + lx
+
+            # when periodic adjustments are finished, we add 1 to our imaging coefficient
+            # (for we have moved one whole cell to the right, basically)
+            if np.all(positions < core_spread_init * 2.0) and periodic_flag:
+                ix += 1
+                periodic_flag = False
+
+            core_x = np.mean(positions) + ix * lx
+
+            if frame % 10 == 0:
+                print(
+                    f'X: {core_x:.4f}',
+                    f'{frame}/{total_frames} ({(frame / total_frames * 100.0):.1f}%)',
+                    f'{(time.time() - start_time):.2f} sec',
+                    sep='\t|| '
+                )
+
+            writer.writerow([timestep, core_x])
+
+    print(f'\nTotal time elapsed: {(time.time() - start_time):.2f} sec')
+    print(f'Output file: {output_file}')

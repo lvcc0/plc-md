@@ -20,7 +20,7 @@ pair_style eam/alloy
 pair_coeff * * ${potential_al} Al
 
 # --- variables --- #
- 
+
 region top_region block INF                  INF &
                         $(ly-v_layer_thresh) INF &
                         INF                  INF units box
@@ -93,5 +93,10 @@ print "## temperature equilibration ##"
 print "###                         ###"
 
 run ${equilibration_run_steps}
+
+unfix 1
+unfix 2
+unfix 3
+unfix 4
 
 write_restart restarts/equilibrations/${file_name}.restart

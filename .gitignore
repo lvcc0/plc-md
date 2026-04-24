@@ -1,10 +1,14 @@
+*
+!*.*
+!*/
+
+# ^ ignores all files without extension
+
 logs/
 dumps/
 restarts/
 results/
 
-*.mp4
-*.odt
-*.odt#
-
 venv/
+
+*.ovito
