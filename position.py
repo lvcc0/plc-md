@@ -10,19 +10,46 @@ from ovito.modifiers import PolyhedralTemplateMatchingModifier, \
                             DeleteSelectedModifier
 
 
+INPUT_DIR = Path('dumps/shears')      # should already exist
+OUTPUT_DIR = Path('results/mobility') # will create if doesn't exist
+
+PRINT_FREQ = 10 # printing in the main loop
+
+
 if __name__ == '__main__':
 
     """
     STEP 0: parse script arguments
+
+    getting input (dump) and ouput (csv) file names
     """
 
     parser = ArgumentParser(description='OVITO dislocation mobility analysis')
 
-    # it is kinda crucial for you to provide dump file name for calculations
-    parser.add_argument('-i', '--input', type=str, required=True, help='relative path to the input LAMMPS dump file')
+    parser.add_argument('-i', '--input', type=str, help='relative path to the input LAMMPS dump file')
     parser.add_argument('-o', '--output', type=str, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
 
     args = parser.parse_args()
+
+    if not args.input:
+        # get latest file in the directory
+        input_file = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
+        print(f'Input file name was not provided, using latest dump file: {input_file}')
+    else:
+        input_file = args.input
+    
+    # create directory for calculation results if it doesn't exist
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # if output file name is not provided, make it "input_file.stem".csv and place it in ./results/mobility
+    output_file = args.output if args.output else Path(input_file).stem + '.csv'
+    output_file = OUTPUT_DIR / Path(output_file)
+
+    # rename with a number ("file_(n).csv") if file exists
+    counter = 1
+    while output_file.exists():
+        output_file = output_file.with_name(output_file.stem.replace(f'_({counter - 1})', '') + f'_({counter}){output_file.suffix}')
+        counter += 1
 
     """
     STEP 1: isolate dislocation structure
@@ -32,13 +59,14 @@ if __name__ == '__main__':
     """
 
     # import file
-    # LAMMPS dump columns: id x y z ix iy iz
-    pipeline = import_file(args.input, columns=[
+    # LAMMPS dump columns: id x y z
+    pipeline = import_file(input_file, columns=[
         'Particle Identifier',
         'Position.X', 'Position.Y', 'Position.Z'
     ])
 
     # 1. selecting middle horizontal layer of the cell for PTM to calculate faster (limiting calculation zone)
+    #    we assume that the dislocation is in the middle for this to work
     zone_selection_mod = ExpressionSelectionModifier(
         expression='Position.Y < CellSize.Y * 0.5 + %f && Position.Y > CellSize.Y * 0.5 - %f' % (16.0, 16.0)
     )
@@ -63,20 +91,6 @@ if __name__ == '__main__':
     """
     STEP 2: get dislocation position at each moment of time and save each frame data in an external csv file for further analysis
     """
-
-    # create directory for calculation results
-    output_dir = Path('results/mobility')
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # if output file name is not provided, make it "input stem".csv and place it in ./results/mobility
-    output_file = args.output if args.output else Path(args.input).stem + '.csv'
-    output_file = output_dir / Path(output_file)
-
-    # rename with a number ("file_(n).csv") if file exists
-    counter = 1
-    while output_file.exists():
-        output_file = output_file.with_name(output_file.stem.replace(f'_({counter - 1})', '') + f'_({counter}){output_file.suffix}')
-        counter += 1
     
     start_time = time.time()
     total_frames = pipeline.num_frames
@@ -124,7 +138,7 @@ if __name__ == '__main__':
 
             core_x = np.mean(positions) + ix * lx
 
-            if frame % 10 == 0:
+            if frame % PRINT_FREQ == 0:
                 print(
                     f'X: {core_x:.4f}',
                     f'{frame}/{total_frames} ({(frame / total_frames * 100.0):.1f}%)',

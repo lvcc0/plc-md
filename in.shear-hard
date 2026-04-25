@@ -13,7 +13,7 @@ if "$(is_defined(variable, file_name) == 0)" then &
   "shell date +%Y-%m-%d_%H-%M > timestamp.tmp"    &
   "variable timestamp file timestamp.tmp"         &
   "shell rm timestamp.tmp"                        &
-  "variable file_name string shear.${timestamp}"
+  "variable file_name string shear-hard.${timestamp}"
 
 # --- general settings --- #
 
@@ -40,19 +40,13 @@ group top_layer region top_region                # mobile rigid top layer
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
 
-# ---                                                                --- #
-# --- STEP 3: apply constant force to calculate dislocation velocity --- #
-# ---                                                                --- #
+# ---                                                                              --- #
+# --- STEP 3: move top layer with constant speed to calculate dislocation velocity --- #
+# ---                                                                              --- #
 
 reset_timestep 0
 
 timestep ${shear_run_timestep}
-
-# number of atoms in top layer
-variable ntop equal count(top_layer)
-
-# force applied to the upper layer to move it, [N]
-variable shearforce equal v_sigma*(lx*ly)/(v_ntop*v_eV_to_J)
 
 # define temperature
 compute mobile_temp mobile temp
@@ -62,12 +56,10 @@ velocity top_layer set 0.0 0.0 0.0 units box
 velocity bot_layer set 0.0 0.0 0.0 units box
 
 # define boundary conditions
-fix 1 top_layer setforce NULL 0.0 NULL
-fix 2 bot_layer setforce 0.0  0.0 NULL
-fix 3 top_layer aveforce ${shearforce} 0.0 0.0
-fix 4 top_layer rigid group 1 top_layer
+fix 1 bot_layer setforce 0.0 0.0 0.0
+fix 2 top_layer move     linear ${shear_velocity} 0.0 0.0 units box
 
-fix 5 mobile nve
+fix 3 mobile nve
 
 thermo        100
 thermo_modify temp mobile_temp
@@ -80,8 +72,8 @@ dump 1 all custom ${shear_dump_freq} &
      dumps/shears/${file_name}.atom  &
      id x y z
 
-print "###                                         ###"
-print "## shear modelling (applying constant force) ##"
-print "###                                         ###"
+print "###                                             ###"
+print "## shear modelling (constant top layer velocity) ##"
+print "###                                             ###"
 
 run ${shear_run_steps}
