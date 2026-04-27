@@ -13,7 +13,8 @@ from ovito.modifiers import PolyhedralTemplateMatchingModifier, \
 INPUT_DIR = Path('dumps/shears')      # should already exist
 OUTPUT_DIR = Path('results/mobility') # will create if doesn't exist
 
-PRINT_FREQ = 10 # printing in the main loop
+PRINT_FREQ = 10   # printing in the main loop
+INVIS_THRESH = 16 # "invisibility frames" after periodic adjustment in case of fluctuating on the edge
 
 
 if __name__ == '__main__':
@@ -24,7 +25,7 @@ if __name__ == '__main__':
     getting input (dump) and ouput (csv) file names
     """
 
-    parser = ArgumentParser(description='OVITO dislocation mobility analysis')
+    parser = ArgumentParser(description='OVITO dislocation mobility analysis: time-position relation csv output.')
 
     parser.add_argument('-i', '--input', type=str, help='relative path to the input LAMMPS dump file')
     parser.add_argument('-o', '--output', type=str, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
@@ -104,6 +105,7 @@ if __name__ == '__main__':
     ix = 0                    # imaging coefficient (to move dislocation's atoms ix * lx to the right after periodic adjustments)
     
     periodic_flag = False # was there a periodic adjustment?
+    invis_frames = 0
 
     print(f'Total frames to calculate: {total_frames}\n')
 
@@ -123,20 +125,30 @@ if __name__ == '__main__':
             core_spread = np.max(positions) - np.min(positions)
 
             # take periodic movement into account
-            if np.any(positions < core_spread_init * 2.0) and core_spread > core_spread_init * 2.0:
-                if not periodic_flag:
-                    periodic_flag = True
+            # only account for periodic adjustment if it wasn't accounted for in the previous INVIS_THRESH frames
+            if not invis_frames:
+                # "if dislocation is visually split in two because of the periodic movement"
+                if np.any(positions < core_spread_init * 2.0) and core_spread > core_spread_init * 2.0:
+                    if not periodic_flag:
+                        periodic_flag = True
 
-                # move all the atoms that "teleported" to the left one lx to the right (make dislocation structure whole)
-                positions[positions < core_spread_init * 2.0] = positions[positions < core_spread_init * 2.0] + lx
+                    # move all the atoms that "teleported" to the left one lx to the right (make dislocation structure whole)
+                    positions[positions < core_spread_init * 2.0] = positions[positions < core_spread_init * 2.0] + lx
 
-            # when periodic adjustments are finished, we add 1 to our imaging coefficient
-            # (for we have moved one whole cell to the right, basically)
-            if np.all(positions < core_spread_init * 2.0) and periodic_flag:
-                ix += 1
-                periodic_flag = False
+                # when periodic adjustments are finished, we increment our imaging coefficient
+                # (for we have moved one whole cell to the right, basically)
+                if np.all(positions < core_spread_init * 2.0) and periodic_flag:
+                    ix += 1
+                    periodic_flag = False
+
+                    # initiate invisibility for a few frames
+                    invis_frames = INVIS_THRESH
 
             core_x = np.mean(positions) + ix * lx
+
+            # decrement "invisibility frames"
+            if invis_frames:
+                invis_frames -= 1
 
             if frame % PRINT_FREQ == 0:
                 print(

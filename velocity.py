@@ -15,13 +15,9 @@ if __name__ == '__main__':
     STEP 0: parse script arguments
     """
 
-    # TODO: nice description
-    parser = ArgumentParser(description='something something dislocation speed')
+    parser = ArgumentParser(description='OVITO dislocation mobility analysis: time-position, time-velocity data calculation and plotting.')
 
-    # TODO: helps
-    # TODO: output saving
-    parser.add_argument('-i', '--input', type=str, help='')
-    parser.add_argument('-s', '--save', action='store_true', help='')
+    parser.add_argument('-i', '--input', type=str, help='relative path to the input csv file')
 
     args = parser.parse_args()
 
