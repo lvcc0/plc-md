@@ -7,7 +7,7 @@ if "$(is_defined(variable, file_name) == 0)" then &
   "shell rm timestamp.tmp"                        &
   "variable file_name string equilibration.${timestamp}"
 
-variable atom_file string "atoms.fcc.edge.pad"
+variable atom_file string "atoms.pad"
 read_data ${atom_file}
 
 # --- general settings --- #
