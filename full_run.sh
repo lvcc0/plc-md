@@ -9,11 +9,11 @@ fi
 read -p "Soft [s] or Hard [h] loading for shear modelling: " choice
 
 case $choice in
-    [Ss] *)
+    [Ss])
         echo "You selected Soft-loading (constant force)"
         SHEAR_SCRIPT="in.shear-soft"        
         ;;
-    [Hh] *)
+    [Hh])
         echo "You selected Hard-loading (constant speed)"
         SHEAR_SCRIPT="in.shear-hard"
         ;;
@@ -26,10 +26,33 @@ esac
 # create venv if it doesn't exist
 [ -d "venv" ] || python -m venv venv
 
-# TODO: should install python packages here actually
-
 # activate venv
 source venv/bin/activate
+
+# checking for packages
+while IFS= read -r line || [ -n "$line" ]; do
+    # skip empty lines
+    [[ -z "$line" || "$line" == /#* ]] && continue
+
+    # getting package name
+    pkg=$(echo "$line" | sed 's/[<>=!].*//')
+
+    # trying to import found pkg
+    python -c "import $pkg" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "\e[32m[v] $pkg is installed.\e[0m"
+    else
+        echo -e "\e[31m[x] $pkg is not installed. trying to install $line...\e[0m"
+        pip install "$line"
+
+        if [ $? -eq 0]; then
+            echo -e "\e[32m[v] success: $line\e[0m"
+        else
+            echo -e "\e[31m[x] error: $line\e[0m"
+        fi
+    fi
+done < "requirements.txt"
 
 # make "run.sh" executable if it's not
 [ -x "run.sh" ] || chmod +x "run.sh"
