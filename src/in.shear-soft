@@ -1,4 +1,4 @@
-include common.ini
+include src/common.ini
 
 # if restart file name is not given, get the last modified one
 if "$(is_defined(variable, restart_file) == 0)" then                 &

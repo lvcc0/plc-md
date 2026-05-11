@@ -64,5 +64,5 @@ done < "requirements.txt"
 ./run.sh in.equilibration
 ./run.sh $SHEAR_SCRIPT
 
-python position.py
-python velocity.py
+python src/position.py
+python src/velocity.py

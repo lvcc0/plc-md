@@ -1,3 +1,5 @@
+import os
+
 from argparse import ArgumentParser
 from pathlib import Path
 from scipy.signal import savgol_filter
@@ -5,6 +7,8 @@ from scipy.signal import savgol_filter
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+if os.getcwd().endswith('src'): os.chdir('..')
 
 INPUT_DIR = Path('results/mobility') # should already exist
 

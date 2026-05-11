@@ -1,4 +1,4 @@
-include common.ini
+include src/common.ini
 
 # getting datetime data for naming files
 if "$(is_defined(variable, file_name) == 0)" then &
@@ -7,7 +7,12 @@ if "$(is_defined(variable, file_name) == 0)" then &
   "shell rm timestamp.tmp"                        &
   "variable file_name string equilibration.${timestamp}"
 
-variable atom_file string "atoms.pad"
+# if atom file name is not given, get the last modified one
+if "$(is_defined(variable, atom_file) == 0)" then &
+  "shell ls -t atoms.* | head -1 > atom_file.tmp" &
+  "variable atom_file file atom_file.tmp"         &
+  "shell rm atom_file.tmp" 
+
 read_data ${atom_file}
 
 # --- general settings --- #

@@ -1,1 +1,1 @@
-// TODO :)
+all the scripts from */src* should be ran from **root** of this repo

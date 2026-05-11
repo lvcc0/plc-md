@@ -1,6 +1,8 @@
 import time
 import csv
+import os
 import numpy as np
+
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -9,6 +11,8 @@ from ovito.modifiers import PolyhedralTemplateMatchingModifier, \
                             ExpressionSelectionModifier, \
                             DeleteSelectedModifier
 
+
+if os.getcwd().endswith('src'): os.chdir('..')
 
 INPUT_DIR = Path('dumps/shears')      # should already exist
 OUTPUT_DIR = Path('results/mobility') # will create if doesn't exist
@@ -22,7 +26,7 @@ if __name__ == '__main__':
     """
     STEP 0: parse script arguments
 
-    getting input (dump) and ouput (csv) file names
+    getting input (dump) and output (csv) file names
     """
 
     parser = ArgumentParser(description='OVITO dislocation mobility analysis: time-position relation csv output.')
