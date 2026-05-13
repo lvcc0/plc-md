@@ -149,7 +149,6 @@ if __name__ == '__main__':
         title='max fluctuation spread (over max length, %) by entry'
     )
 
-    plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()
 
     plt.savefig(

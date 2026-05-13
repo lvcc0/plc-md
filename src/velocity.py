@@ -27,10 +27,8 @@ if __name__ == '__main__':
 
     if not args.input:
         # get latest file in the directory
-        input_file = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
-        print(f'Input file name was not provided, using latest csv file: {input_file}')
-    else:
-        input_file = args.input
+        args.input = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
+        print(f'Input file name was not provided, using latest csv file: {args.input}')
 
     """
     STEP 1: calculate and plot given data
@@ -43,7 +41,7 @@ if __name__ == '__main__':
     dt = 1.0
     timestep = 100
 
-    with open('common.ini', 'r') as config:
+    with open('src/common.ini', 'r') as config:
         for line in config:
             if line.startswith('variable shear_run_timestep'):
                 dt = float(line.split()[3]) # [ps]
@@ -52,7 +50,7 @@ if __name__ == '__main__':
                 timestep = int(line.split()[3]) # [frames] ig
 
 
-    df = pd.read_csv(input_file)
+    df = pd.read_csv(args.input)
 
     fig, (ax_tOx, ax_tOv) = plt.subplots(nrows=1, ncols=2)
 
