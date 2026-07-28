@@ -72,8 +72,12 @@ if __name__ == '__main__':
 
     # full velocity median
     median_velocity = df['v_raw'].median()
+    print(f'Median velocity: {median_velocity} Ang/ps = {(median_velocity * 100.0):.4f} m/s')
 
-    print(f'Median velocity: {median_velocity:.4f} Ang/ps = {(median_velocity * 100.0):.4f} m/s')
+    # full velocity mean
+    mean_velocity = df['v_raw'].mean()
+    print(f'Mean velocity: {mean_velocity} Ang/ps = {(mean_velocity * 100.0):.4f} m/s')
+    
 
     # (time, X-coordinate) plot
     df.plot(
@@ -90,15 +94,22 @@ if __name__ == '__main__':
             # 'v_raw',
             'v_savgol',
             # 'v_median',
-            'v_ewm'
+            # 'v_ewm'
         ],
         ax=ax_tOv,
         title='velocity [Ang/ps] over time [ps]'
     )
     
     # velocity median
+    # ax_tOv.axhline(
+    #     y=median_velocity,
+    #     color='green',
+    #     linestyle='--'
+    # )
+
+    # velocity mean
     ax_tOv.axhline(
-        y=median_velocity,
+        y=mean_velocity,
         color='red',
         linestyle='--'
     )
