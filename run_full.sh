@@ -30,7 +30,7 @@ esac
 source venv/bin/activate
 
 # checking for packages
-while IFS= read -r line || [ -n "$line" ]; do
+while IFS=read -r line || [ -n "$line" ]; do
     # skip empty lines
     [[ -z "$line" || "$line" == /#* ]] && continue
 
@@ -46,7 +46,7 @@ while IFS= read -r line || [ -n "$line" ]; do
         echo -e "\e[31m[x] $pkg is not installed. trying to install $line...\e[0m"
         pip install "$line"
 
-        if [ $? -eq 0]; then
+        if [ $? -eq 0 ]; then
             echo -e "\e[32m[v] success: $line\e[0m"
         else
             echo -e "\e[31m[x] error: $line\e[0m"
@@ -61,8 +61,13 @@ done < "requirements.txt"
 # ACTUAL CALCULATIONS #
 #######################
 
-./run.sh in.equilibration
-./run.sh $SHEAR_SCRIPT
+if [[ " $* " == *" --gpu "* ]]; then
+	./run.sh src/in.equilibration --gpu
+	./run.sh src/$SHEAR_SCRIPT --gpu
+else
+	./run.sh src/in.equilibration
+	./run.sh src/$SHEAR_SCRIPT
+fi
 
 python src/position.py
 python src/velocity.py

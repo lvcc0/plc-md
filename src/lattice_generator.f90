@@ -129,7 +129,7 @@ select case (structure_choice)
         write(fileunit,*) 'Position data for Al File'
         write(fileunit,*)
         write(fileunit,*) cells_total * 6, 'atoms'
-        write(fileunit,*) '1 atom types'
+        write(fileunit,*) '2 atom types'
         write(fileunit,*) box_dim(1, 1:2), 'xlo xhi'
         write(fileunit,*) box_dim(2, 1:2), 'ylo yhi'
         write(fileunit,*) box_dim(3, 1:2), 'zlo zhi'
@@ -203,7 +203,7 @@ select case (structure_choice)
         write(fileunit,*) 'Position data for Al File'
         write(fileunit,*)
         write(fileunit,*) (cells_total - cell_number(3) * cell_number(2) / 2) * 6, 'atoms'
-        write(fileunit,*) '1 atom types'
+        write(fileunit,*) '2 atom types'
         write(fileunit,*) box_dim(1, 1:2), ' xlo xhi'
         write(fileunit,*) box_dim(2, 1:2), ' ylo yhi'
         write(fileunit,*) box_dim(3, 1:2), ' zlo zhi'

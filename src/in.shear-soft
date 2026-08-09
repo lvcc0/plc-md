@@ -1,3 +1,5 @@
+# NOTE: does NOT work, i did't rework this one and don't think i will!
+
 include src/common.ini
 
 # if restart file name is not given, get the last modified one

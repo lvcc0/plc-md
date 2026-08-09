@@ -15,16 +15,15 @@ if "$(is_defined(variable, restart_file) == 0)" then                 &
 
 read_restart restarts/equilibrations/${restart_file}
 
-# --- general settings --- #
+# ---                      --- #
+# --- system configuration --- #
+# ---                      --- #
 
 # logging results
 log logs/shears/${file_name}.log
 shell rm log.lammps
 
-pair_style eam/alloy
-pair_coeff * * ${potential_al} Al
-
-# --- variables --- #
+# --- dividing into regions --- #
 
 # note: perhaps i can do smth to not copy these lines from previous file
 
@@ -40,6 +39,23 @@ group top_layer region top_region                # mobile rigid top layer
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
 
+# --- potential config --- #
+
+pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
+pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
+
+# default values (used if values below are not uncommented)
+#neighbor 2.0 bin
+#neigh_modify delay 0 every 1 check yes
+
+# performance tuned
+#neighbor 2.0 bin
+#neigh_modify delay 10 every 2 check yes
+
+# stability tuned (set if "Dangerous builds" != 0)
+#neighbor 3.0 bin
+#neigh_modify delay 0 every 1 check yes
+
 # ---                                                                              --- #
 # --- STEP 3: move top layer with constant speed to calculate dislocation velocity --- #
 # ---                                                                              --- #
@@ -48,7 +64,7 @@ reset_timestep 0
 
 timestep ${shear_run_timestep}
 
-# define temperature
+# define temperature (only of the moving atoms)
 compute mobile_temp mobile temp
 
 # define boundary velocities
@@ -59,18 +75,18 @@ velocity bot_layer set 0.0 0.0 0.0 units box
 fix 1 bot_layer setforce 0.0 0.0 0.0
 fix 2 top_layer move     linear ${shear_velocity} 0.0 0.0 units box
 
-fix 3 mobile nve
+fix 3 mobile npt temp ${desired_temp} ${desired_temp} 0.1 x 0.0 0.0 1.0 z 0.0 0.0 1.0
 
-thermo        100
+thermo        1000
 thermo_modify temp mobile_temp
-thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
+thermo_style  custom step pe ke temp press
 
 # each frame is taken after 100 timesteps, so actual time elapsed per frame is:
 # 100 * 2e-15 = 2e-13
 
 dump 1 all custom ${shear_dump_freq} &
      dumps/shears/${file_name}.atom  &
-     id x y z
+     id type x y z
 
 print "###                                             ###"
 print "## shear modelling (constant top layer velocity) ##"

@@ -15,16 +15,22 @@ if "$(is_defined(variable, atom_file) == 0)" then &
 
 read_data ${atom_file}
 
-# --- general settings --- #
+# ---                      --- #
+# --- system configuration --- #
+# ---                      --- #
 
 # logging results
 log logs/equilibrations/${file_name}.log
 shell rm log.lammps
 
-pair_style eam/alloy
-pair_coeff * * ${potential_al} Al
+# --- replacing exactly 5at% of Al with Mg --- #
 
-# --- variables --- #
+set type 1 type/fraction 2 0.05 12345
+
+mass 1 ${al_mass}
+mass 2 ${mg_mass}
+
+# --- dividing into regions --- #
 
 region top_region block INF                  INF &
                         $(ly-v_layer_thresh) INF &
@@ -38,12 +44,29 @@ group top_layer region top_region                # mobile rigid top layer
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
 
+# --- potential config --- #
+
+pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
+pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
+
+# default values (used if values below are not uncommented)
+#neighbor 2.0 bin
+#neigh_modify delay 0 every 1 check yes
+
+# performance tuned
+#neighbor 2.0 bin
+#neigh_modify delay 10 every 2 check yes
+
+# stability tuned (set if "Dangerous builds" != 0)
+#neighbor 3.0 bin
+#neigh_modify delay 0 every 1 check yes
+
 # ---                                --- #
 # --- STEP 1: minimize system energy --- #
 # ---                                --- #
 
-# 1e-12 * 1e-2 = 1e-14 sec
-timestep 0.01
+# 1e-12 * 1e-2 = 1e-14 sec = 10 fs
+timestep 0.01 # [ps]
 
 compute pot_energy all pe/atom
 compute stress     all stress/atom NULL
@@ -67,22 +90,21 @@ unfix 1
 unfix 2
 reset_timestep 0
 
-# define temperature
+# define temperature (only of the moving atoms)
 compute mobile_temp mobile temp
 
 # initialize atom velocities
-velocity mobile create ${desired_temp} 54321 units box
+velocity mobile create ${desired_temp} 12345 units box
 velocity mobile zero   linear
 velocity mobile zero   angular
 
 # equilibrate the temperature
-fix 1 mobile nve
-fix 2 mobile temp/rescale 1 ${desired_temp} ${desired_temp} 1.0 0.5
-fix_modify 2 temp mobile_temp
+fix 1 mobile npt temp ${desired_temp} ${desired_temp} 0.1 x 0.0 0.0 1.0 z 0.0 0.0 1.0
+fix_modify 1 temp mobile_temp
 
 # boundary conditions
-fix 3 top_layer setforce 0.0 0.0 NULL
-fix 4 bot_layer setforce 0.0 0.0 NULL
+fix 2 top_layer setforce 0.0 0.0 NULL
+fix 3 bot_layer setforce 0.0 0.0 NULL
 
 thermo        100
 thermo_modify temp mobile_temp
@@ -90,7 +112,7 @@ thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
 
 dump 1 all custom ${equilibration_dump_freq} &
      dumps/equilibrations/${file_name}.atom  &
-     id x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
+     id type x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
 
 print "###                         ###"
 print "## temperature equilibration ##"
@@ -101,6 +123,5 @@ run ${equilibration_run_steps}
 unfix 1
 unfix 2
 unfix 3
-unfix 4
 
 write_restart restarts/equilibrations/${file_name}.restart

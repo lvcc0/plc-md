@@ -56,7 +56,9 @@ if __name__ == '__main__':
 
     df['t'] *= dt # convert timesteps to real time [ps]
 
-    df['v_raw'] = df['x'].diff() / df['t'].diff()
+    # --- getting data for different graphs (just smoothing raw data) --- #
+
+    df['v_raw'] = df['x'].diff() / df['t'].diff() # actual raw valocity
 
     df['v_savgol'] = savgol_filter(
         df['x'],
@@ -67,18 +69,21 @@ if __name__ == '__main__':
     )
 
     df['v_median'] = df['v_raw'].rolling(window=5, center=True).median()
-
+    
+    df['v_mean'] = df['v_raw'].rolling(window=5, center=True).mean()
+    
     df['v_ewm'] = df['v_raw'].ewm(span=16, adjust=False).mean()
 
-    # full velocity median
+    # --- #
+
+    # full velocity median (actual number)
     median_velocity = df['v_raw'].median()
     print(f'Median velocity: {median_velocity} Ang/ps = {(median_velocity * 100.0):.4f} m/s')
 
-    # full velocity mean
+    # full velocity mean (actual number)
     mean_velocity = df['v_raw'].mean()
     print(f'Mean velocity: {mean_velocity} Ang/ps = {(mean_velocity * 100.0):.4f} m/s')
     
-
     # (time, X-coordinate) plot
     df.plot(
         x='t',
@@ -94,6 +99,7 @@ if __name__ == '__main__':
             # 'v_raw',
             'v_savgol',
             # 'v_median',
+            # 'v_mean',
             # 'v_ewm'
         ],
         ax=ax_tOv,

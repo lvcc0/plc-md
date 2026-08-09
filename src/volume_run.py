@@ -65,4 +65,3 @@ if __name__ == '__main__':
 
     for key, val in dict(sorted(times.items(), key=lambda x: int(x[0].split('x')[0]))):
         print(f'{key}: {val:.2f}')
-

@@ -17,7 +17,7 @@ if os.getcwd().endswith('src'): os.chdir('..')
 INPUT_DIR = Path('dumps/shears')      # should already exist
 OUTPUT_DIR = Path('results/mobility') # will create if doesn't exist
 
-PRINT_FREQ = 10 # printing in the main loop
+PRINT_FREQ = 10          # printing in the main loop
 CORE_SPREAD_THRESH = 3.0 # dislocation spread after which we consider it split in two by the periodic movement
 
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     so we can leave out only dislocation (basically the only non-FCC) structure.
     """
 
-    print(f'Importing file:{args.input}')
+    print(f'Importing file: {args.input}')
 
     # import file
     # LAMMPS dump columns: id x y z
@@ -166,4 +166,3 @@ if __name__ == '__main__':
 
     print(f'\nTotal time elapsed: {(time.time() - start_time):.2f} sec')
     print(f'Output file: {args.output}')
-
