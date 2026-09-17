@@ -40,7 +40,7 @@ if __name__ == '__main__':
         # get latest file in the directory
         args.input = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
         print(f'Input file name was not provided, using latest dump file: {args.input}')
-    
+
     if not args.output:
         # create directory for calculation results if it doesn't exist and save output there
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     """
     STEP 2: get dislocation position at each moment of time and save each frame data in an external csv file for further analysis
     """
-    
+
     start_time = time.time()
     total_frames = pipeline.num_frames
 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
     init_positions = data_init.particles.positions[:, 0]
     core_spread_init = np.max(init_positions) - np.min(init_positions)
-    
+
     flag = False # have we started the periodic adjustment?
 
     print(f'Total frames to calculate: {total_frames}\n')
@@ -132,7 +132,7 @@ if __name__ == '__main__':
             if flag and positions.min() > txl and positions.max() < txr:
                 flag = False
                 ix += 1
-            
+
             # --- adjusted successfully (hopefully) --- #
 
             # actual dislocation position that we save

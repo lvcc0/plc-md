@@ -93,10 +93,10 @@ if __name__ == '__main__':
                     f'{(time.time() - local_start_time):.2f} sec',
                     sep='\t|| '
                 )
-            
+
             # save row of data
             df = pd.concat(
-                [df, pd.DataFrame([{'t': timestep, 'x': core_x}])], 
+                [df, pd.DataFrame([{'t': timestep, 'x': core_x}])],
                 ignore_index=True
             )
 

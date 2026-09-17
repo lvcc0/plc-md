@@ -38,7 +38,7 @@ region bot_region block INF INF            &
                         INF v_layer_thresh &
                         INF INF            units box
 
-group top_layer region top_region                # mobile rigid top layer 
+group top_layer region top_region                # mobile rigid top layer
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
 

@@ -4,7 +4,6 @@
 #       more often than not it should be 2:
 #
 #export OMP_NUM_THREADS=2
-#
 
 # NOTE: this script is dumb so please put the name
 #       of the script you want to run in $1

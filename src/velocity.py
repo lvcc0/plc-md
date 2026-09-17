@@ -69,9 +69,9 @@ if __name__ == '__main__':
     )
 
     df['v_median'] = df['v_raw'].rolling(window=5, center=True).median()
-    
+
     df['v_mean'] = df['v_raw'].rolling(window=5, center=True).mean()
-    
+
     df['v_ewm'] = df['v_raw'].ewm(span=16, adjust=False).mean()
 
     # --- #
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     # full velocity mean (actual number)
     mean_velocity = df['v_raw'].mean()
     print(f'Mean velocity: {mean_velocity} Ang/ps = {(mean_velocity * 100.0):.4f} m/s')
-    
+
     # (time, X-coordinate) plot
     df.plot(
         x='t',
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         ax=ax_tOv,
         title='velocity [Ang/ps] over time [ps]'
     )
-    
+
     # velocity median
     # ax_tOv.axhline(
     #     y=median_velocity,

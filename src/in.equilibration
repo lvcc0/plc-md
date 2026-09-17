@@ -7,6 +7,10 @@ if "$(is_defined(variable, file_name) == 0)" then &
   "shell rm timestamp.tmp"                        &
   "variable file_name string equilibration.${timestamp}"
 
+# logging results
+log logs/equilibrations/${file_name}.log
+shell rm log.lammps
+
 # if atom file name is not given, get the last modified one
 if "$(is_defined(variable, atom_file) == 0)" then &
   "shell ls -t atoms.* | head -1 > atom_file.tmp" &
@@ -14,14 +18,11 @@ if "$(is_defined(variable, atom_file) == 0)" then &
   "shell rm atom_file.tmp" 
 
 read_data ${atom_file}
+print "reading data from ${atom_file}"
 
 # ---                      --- #
 # --- system configuration --- #
 # ---                      --- #
-
-# logging results
-log logs/equilibrations/${file_name}.log
-shell rm log.lammps
 
 # --- replacing exactly 5at% of Al with Mg --- #
 
@@ -40,7 +41,7 @@ region bot_region block INF INF            &
                         INF v_layer_thresh &
                         INF INF            units box
 
-group top_layer region top_region                # mobile rigid top layer 
+group top_layer region top_region                # moving rigid top layer 
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
 
@@ -65,14 +66,22 @@ pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (becaus
 # --- STEP 1: minimize system energy --- #
 # ---                                --- #
 
-# 1e-12 * 1e-2 = 1e-14 sec = 10 fs
-timestep 0.01 # [ps]
+timestep ${equilibration_run_timestep}
 
-compute pot_energy all pe/atom
-compute stress     all stress/atom NULL
+compute pot_energy  all    pe/atom
+compute stress      all    stress/atom NULL
+compute mobile_temp mobile temp             # temperature of moving atoms only
 
 fix 1 top_layer setforce 0.0 0.0 NULL
 fix 2 bot_layer setforce 0.0 0.0 NULL
+
+thermo        ${equilibration_dump_freq}
+thermo_modify temp mobile_temp
+thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
+
+dump 1 all custom ${equilibration_dump_freq} &
+     dumps/equilibrations/${file_name}.atom  &
+     id type x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
 
 print "###                   ###"
 print "## energy minimization ##"
@@ -84,14 +93,8 @@ minimize 0.0 1.0e-8 10000 100000
 # --- STEP 2: temperature equilibration --- #
 # ---                                   --- #
 
-timestep ${equilibration_run_timestep}
-
 unfix 1
 unfix 2
-reset_timestep 0
-
-# define temperature (only of the moving atoms)
-compute mobile_temp mobile temp
 
 # initialize atom velocities
 velocity mobile create ${desired_temp} 12345 units box
@@ -105,14 +108,6 @@ fix_modify 1 temp mobile_temp
 # boundary conditions
 fix 2 top_layer setforce 0.0 0.0 NULL
 fix 3 bot_layer setforce 0.0 0.0 NULL
-
-thermo        100
-thermo_modify temp mobile_temp
-thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
-
-dump 1 all custom ${equilibration_dump_freq} &
-     dumps/equilibrations/${file_name}.atom  &
-     id type x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
 
 print "###                         ###"
 print "## temperature equilibration ##"

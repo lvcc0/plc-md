@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+# NOTE: no lattice generation!
+#       need to generate atoms file beforehand!
+
 # we don't want this to be ran with sudo
 if [ ! -z "$SUDO_USER" ]; then
     echo "don't sudo this, please"
@@ -11,7 +14,7 @@ read -p "Soft [s] or Hard [h] loading for shear modelling: " choice
 case $choice in
     [Ss])
         echo "You selected Soft-loading (constant force)"
-        SHEAR_SCRIPT="in.shear-soft"        
+        SHEAR_SCRIPT="in.shear-soft"
         ;;
     [Hh])
         echo "You selected Hard-loading (constant speed)"

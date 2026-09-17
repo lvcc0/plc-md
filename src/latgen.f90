@@ -1,4 +1,4 @@
-program LatticeGenerator
+program LatGen
 
 use iso_fortran_env, only: dp => real64
 implicit none
@@ -25,7 +25,7 @@ real(dp), allocatable :: atoms(:, :, :) ! all atom positions
 
 integer :: cell_number(3) ! number of unit cells along each dimension
 
-logical, allocatable :: active_cells(:) ! (PAD) cells to 'render' 
+logical, allocatable :: active_cells(:) ! (PAD) cells to 'render'
 
 integer :: cells_total ! total number of cells
 
