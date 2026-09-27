@@ -15,7 +15,7 @@ shell rm log.lammps
 if "$(is_defined(variable, atom_file) == 0)" then &
   "shell ls -t atoms.* | head -1 > atom_file.tmp" &
   "variable atom_file file atom_file.tmp"         &
-  "shell rm atom_file.tmp" 
+  "shell rm atom_file.tmp"
 
 read_data ${atom_file}
 print "reading data from ${atom_file}"
@@ -24,12 +24,11 @@ print "reading data from ${atom_file}"
 # --- system configuration --- #
 # ---                      --- #
 
-# --- replacing exactly 5at% of Al with Mg --- #
-
-set type 1 type/fraction 2 0.05 12345
-
 mass 1 ${al_mass}
 mass 2 ${mg_mass}
+
+pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
+pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
 
 # --- dividing into regions --- #
 
@@ -41,14 +40,9 @@ region bot_region block INF INF            &
                         INF v_layer_thresh &
                         INF INF            units box
 
-group top_layer region top_region                # moving rigid top layer 
+group top_layer region top_region                # moving rigid top layer
 group bot_layer region bot_region                # static rigid bottom layer
 group mobile    subtract all top_layer bot_layer # mobile middle layer (just atoms)
-
-# --- potential config --- #
-
-pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
-pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
 
 # default values (used if values below are not uncommented)
 #neighbor 2.0 bin
@@ -77,17 +71,74 @@ fix 2 bot_layer setforce 0.0 0.0 NULL
 
 thermo        ${equilibration_dump_freq}
 thermo_modify temp mobile_temp
-thermo_style  custom step pe ke temp pxx pyy pzz pxy pyz pxz
+thermo_style  custom step temp fnorm fmax lx ly lz # pxx pyy pzz pxy pyz pxz
 
 dump 1 all custom ${equilibration_dump_freq} &
      dumps/equilibrations/${file_name}.atom  &
-     id type x y z c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
+     id type x y z # c_pot_energy c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]
 
 print "###                   ###"
 print "## energy minimization ##"
+print "## (dislocation)       ##"
 print "###                   ###"
 
-minimize 0.0 1.0e-8 10000 100000
+min_style fire
+min_modify dmax 0.0005 vdfmax 20000
+minimize 0.0 1.0e-3 20000 200000
+
+min_style fire
+min_modify dmax 0.001 vdfmax 20000
+minimize 0.0 1.0e-4 20000 200000
+
+min_style fire
+min_modify dmax 0.005 vdfmax 20000
+minimize 0.0 1.0e-6 20000 200000
+
+print "###                   ###"
+print "## energy minimization ##"
+print "## (dislocation+Mg)    ##"
+print "###                   ###"
+
+# NOTE: do not replace atoms in the dislocation core?
+
+set type 1 type/fraction 2 ${mg_frac} 12345
+
+min_style fire
+min_modify dmax 0.001 vdfmax 10000
+minimize 0.0 1.0e-4 10000 100000
+
+min_style fire
+min_modify dmax 0.005 vdfmax 10000
+minimize 0.0 1.0e-6 20000 200000
+
+min_style fire
+min_modify dmax 0.01 vdfmax 10000
+minimize 0.0 1.0e-8 30000 300000
+
+print "###                          ###"
+print "## energy minimization        ##"
+print "## (dislocation+Mg+vacancies) ##"
+print "###                          ###"
+
+# NOTE: do not remove atoms from the dislocation core?
+
+group al_group  type      1
+group al_mobile intersect al_group mobile
+
+delete_atoms random fraction ${vac_frac} yes al_mobile NULL 23456
+reset_atoms id
+
+min_style fire
+min_modify dmax 0.001 vdfmax 10000
+minimize 0.0 1.0e-4 10000 100000
+
+min_style fire
+min_modify dmax 0.005 vdfmax 10000
+minimize 0.0 1.0e-6 20000 200000
+
+min_style fire
+min_modify dmax 0.01 vdfmax 10000
+minimize 0.0 1.0e-8 30000 300000
 
 # ---                                   --- #
 # --- STEP 2: temperature equilibration --- #
@@ -97,7 +148,7 @@ unfix 1
 unfix 2
 
 # initialize atom velocities
-velocity mobile create ${desired_temp} 12345 units box
+velocity mobile create ${desired_temp} 34567 units box
 velocity mobile zero   linear
 velocity mobile zero   angular
 
