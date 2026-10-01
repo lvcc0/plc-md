@@ -1,3 +1,5 @@
+# NOTE: soon to be refactored
+
 import subprocess
 import time
 import os

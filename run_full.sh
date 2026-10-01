@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+# NOTE: this doesn't work for current goals!
+#       don't use this!
+
 # NOTE: no lattice generation!
 #       need to generate atoms file beforehand!
 

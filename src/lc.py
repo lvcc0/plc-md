@@ -1,3 +1,4 @@
+import time
 import csv
 import os
 import numpy as np
@@ -17,6 +18,7 @@ OUTPUT_DIR = Path('results/lc')
 
 RADIUS_DIV = 20 # how many different radiuses is compared
 RADIUS_MIN = 20 # minimal radius, [Ang]
+
 
 if __name__ == '__main__':
 
@@ -55,6 +57,8 @@ if __name__ == '__main__':
     finding the dislocation and preparing the selection around it
     """
 
+    start_time = time.time()
+
     print(f'Importing file: {args.input}')
 
     # import file
@@ -63,6 +67,8 @@ if __name__ == '__main__':
         'Particle Identifier', 'Particle Type',
         'Position.X', 'Position.Y', 'Position.Z'
     ])
+
+    print(f'File imported in {(time.time() - start_time):.2f} sec.')
 
     # 1. finding actual dislocation lines and marking atoms that belong to them
     dxa_mod = DislocationAnalysisModifier(
@@ -82,8 +88,8 @@ if __name__ == '__main__':
     STEP 2: actual computing
 
     c = c(r), where
-    c - local concentration of Mg: c=\frac{N_{Mg}(R)}{N_{Mg}(R)+N_{Al}(R)}
-    r - radius of the cylinder with the center in dislocation's core
+    c - local concentration of Mg: c=\frac{N_{Mg}(r)}{N_{Mg}(r)+N_{Al}(r)}
+    r - radius of the cylinder with the center at dislocation's core
     """
 
     # getting data from the last simulated frame
@@ -106,7 +112,13 @@ if __name__ == '__main__':
     # removing dxa from the pipeline as we don't need it no more
     pipeline.modifiers.remove(dxa_mod)
 
-    print(f'\nComputing c_Mg for {RADIUS_DIV} radiuses ranging linearly from {RADIUS_MIN:.2f} to {r_max:.2f}.\n')
+    expr_part = f'(Position.X - {core_x})^2 + (Position.Y - {core_y})^2'
+
+    print()
+    print(f'Dislocation\'s core coordinates: ({core_x:.2f}, {core_y:.2f}).')
+    print(f'Computing c_Mg for {RADIUS_DIV} radiuses ranging linearly from {RADIUS_MIN:.2f} to {r_max:.2f}.')
+    print(f'Using expression: {expr_part} < r^2. (variable "r")')
+    print()
 
     with open(args.output, mode='w', newline='') as csv_file:
         writer = csv.writer(csv_file)
@@ -117,17 +129,19 @@ if __name__ == '__main__':
 
             # TODO: perhaps there are better ways to do this stuff
 
-            sel_mod.expression = '(Position.X - CellSize.X * 0.5)^2 + (Position.Y - CellSize.Y * 0.5)^2 < %f^2 && ParticleType == 2' % (r)
+            expr = f'{expr_part} < {r}^2'
+
+            sel_mod.expression = f'{expr} && ParticleType == 2'
             data = pipeline.compute(last_frame)
             N_mg = np.sum(data.particles['Selection'])
 
-            sel_mod.expression = '(Position.X - CellSize.X * 0.5)^2 + (Position.Y - CellSize.Y * 0.5)^2 < %f^2' % (r)
+            sel_mod.expression = expr
             data = pipeline.compute(last_frame)
             N = np.sum(data.particles['Selection'])
 
             c = N_mg / N
 
             print(f'c({r:.4f})\t= {c:.4f}')
-            writer.writerow([r, N_mg / N])
+            writer.writerow([r, c])
 
     print(f'\nOutput file: {args.output}')

@@ -65,9 +65,9 @@ group al_mobile intersect al_group mobile
 
 timestep ${eq_run_timestep}
 
-compute pot_energy  all    pe/atom
-compute stress      all    stress/atom NULL
-compute mobile_temp mobile temp             # temperature of moving atoms only
+#compute pot_energy  all    pe/atom
+#compute stress      all    stress/atom NULL
+compute mobile_temp mobile temp # temperature of moving atoms only
 
 thermo        ${eq_dump_freq}
 thermo_modify temp mobile_temp

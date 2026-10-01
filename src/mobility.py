@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='OVITO dislocation mobility analysis: time-position relation csv output.')
 
     parser.add_argument('-i', '--input', type=Path, help='relative path to the input LAMMPS dump file')
-    parser.add_argument('-o', '--output', type=Path, help='output csv file name (filename only, without extension). Will be saved at ./results/mobility')
+    parser.add_argument('-o', '--output', type=Path, help=f'output csv file name (filename only, without extension). Will be saved at ./{OUTPUT_DIR}')
 
     args = parser.parse_args()
 
