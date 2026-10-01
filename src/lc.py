@@ -16,7 +16,7 @@ if os.getcwd().endswith('src'): os.chdir('..')
 INPUT_DIR = Path('dumps/equilibrations')
 OUTPUT_DIR = Path('results/lc')
 
-RADIUS_DIV = 20 # how many different radiuses is compared
+RADIUS_DIV = 40 # how many different radiuses is compared
 RADIUS_MIN = 20 # minimal radius, [Ang]
 
 
@@ -104,9 +104,17 @@ if __name__ == '__main__':
     core_x = np.mean(positions[:, 0])
     core_y = np.mean(positions[:, 1])
 
-    r_max = np.min([core_x, data.cell[0, 0] - core_x,
-                    core_y, data.cell[1, 1] - core_y])
+    w = data.cell[0, 0] # length in X direction
+    h = data.cell[1, 1] # length in Y direction
 
+    # finding max distance from dislocation's core to cell's edges
+    # => all atoms in the cell will be inside the cylinder with radius r_max
+    r_max = np.max([
+        ( core_x**2       + core_y**2       ) ** 0.5,
+        ( core_x**2       + (h - core_y)**2 ) ** 0.5,
+        ( (w - core_x)**2 + core_y**2       ) ** 0.5,
+        ( (w - core_x)**2 + (h - core_y)**2 ) ** 0.5
+    ])
     r_mult = r_max - RADIUS_MIN
 
     # removing dxa from the pipeline as we don't need it no more

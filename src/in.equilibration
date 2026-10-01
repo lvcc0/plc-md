@@ -59,9 +59,10 @@ group al_mobile intersect al_group mobile
 #neighbor 3.0 bin
 #neigh_modify delay 0 every 1 check yes
 
-# ---                                --- #
-# --- STEP 1: minimize system energy --- #
-# ---                                --- #
+# ---                                    --- #
+# --- STEP 1: minimize system energy     --- #
+# ---         and equilibrate the system --- #
+# ---                                    --- #
 
 timestep ${eq_run_timestep}
 
@@ -111,26 +112,40 @@ print "## (dislocation+Mg+vacancies) ##"
 print "###                          ###"
 
 # adding vacancies to the system
-delete_atoms random fraction ${vac_frac} yes al_mobile NULL 1337
-reset_atoms  id
+#delete_atoms random fraction ${vac_frac} yes al_mobile NULL 1337
+#reset_atoms  id
 
-min_modify dmax 0.005
-minimize 0.0 1.0e-3 10000 100000
+#min_modify dmax 0.005
+#minimize 0.0 1.0e-3 10000 100000
 
 # --- final minimization --- #
 
 min_style cg
 minimize 0.0 1.0e-6 10000 100000
 
-# ---                    --- #
-# --- Mg segregation run --- #
-# ---                    --- #
+# --- equilibration --- #
 
 # set initial atom velocities
 velocity mobile create ${desired_temp} 1337 units box dist gaussian loop all mom yes rot yes
 
-fix SEG mobile nvt temp ${desired_temp} ${desired_temp} 0.5
-fix_modify SEG temp mobile_temp
+fix EQ mobile nvt temp ${desired_temp} ${desired_temp} 0.5
+
+print "###             ###"
+print "## equilibration ##"
+print "###             ###"
+
+run ${eq_run_steps}
+
+unfix EQ
+
+# NOTE: perhaps i can skip unfixing/fixing the nvt fix and rock with it till the end
+
+# ---                           --- #
+# --- STEP 2: MC/MD segregation --- #
+# ---                           --- #
+
+fix MD mobile nvt temp ${desired_temp} ${desired_temp} 0.5
+fix MC mobile atom/swap 100 20 1337 ${desired_temp} types 1 2 ke yes
 
 print "###                  ###"
 print "## Mg segregation run ##"
@@ -138,7 +153,8 @@ print "###                  ###"
 
 run ${seg_run_steps}
 
-unfix SEG
+unfix MD
+unfix MC
 unfix TOPFIX
 unfix BOTFIX
 
