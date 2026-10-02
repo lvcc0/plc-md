@@ -20,6 +20,15 @@ if "$(is_defined(variable, atom_file) == 0)" then &
 read_data ${atom_file}
 print "reading data from ${atom_file}"
 
+# uncomment to enable set number seed (debugging purposes)
+#variable seed equal 1337
+
+# getting time-based random seed to use in production runs
+if "$(is_defined(variable, seed) == 0)" then &
+  "shell date +%N > seed.tmp"                &
+  "variable seed file seed.tmp"              &
+  "shell rm seed.tmp"
+
 # ---                      --- #
 # --- system configuration --- #
 # ---                      --- #
@@ -84,8 +93,6 @@ fix BOTFIX bot_layer setforce 0.0 0.0 NULL
 velocity top_layer set 0.0 0.0 0.0
 velocity bot_layer set 0.0 0.0 0.0
 
-# TODO: add random seeds based on current time for production runs
-
 print "###                   ###"
 print "## energy minimization ##"
 print "## (dislocation)       ##"
@@ -101,7 +108,7 @@ print "## (dislocation+Mg)    ##"
 print "###                   ###"
 
 # adding Mg atoms to the system
-set group al_mobile type/fraction 2 ${mg_frac} 1337
+set group al_mobile type/fraction 2 ${mg_frac} ${seed}
 
 min_modify dmax 0.005
 minimize 0.0 1.0e-3 10000 100000
@@ -112,11 +119,11 @@ print "## (dislocation+Mg+vacancies) ##"
 print "###                          ###"
 
 # adding vacancies to the system
-#delete_atoms random fraction ${vac_frac} yes al_mobile NULL 1337
-#reset_atoms  id
+delete_atoms random fraction ${vac_frac} yes al_mobile NULL ${seed}
+reset_atoms  id
 
-#min_modify dmax 0.005
-#minimize 0.0 1.0e-3 10000 100000
+min_modify dmax 0.005
+minimize 0.0 1.0e-3 10000 100000
 
 # --- final minimization --- #
 
@@ -126,7 +133,7 @@ minimize 0.0 1.0e-6 10000 100000
 # --- equilibration --- #
 
 # set initial atom velocities
-velocity mobile create ${desired_temp} 1337 units box dist gaussian loop all mom yes rot yes
+velocity mobile create ${desired_temp} ${seed} units box dist gaussian loop all mom yes rot yes
 
 fix EQ mobile nvt temp ${desired_temp} ${desired_temp} 0.5
 
@@ -145,7 +152,7 @@ unfix EQ
 # ---                           --- #
 
 fix MD mobile nvt temp ${desired_temp} ${desired_temp} 0.5
-fix MC mobile atom/swap 100 20 1337 ${desired_temp} types 1 2 ke yes
+fix MC mobile atom/swap 100 20 ${seed} ${desired_temp} types 1 2 ke yes
 
 print "###                  ###"
 print "## Mg segregation run ##"

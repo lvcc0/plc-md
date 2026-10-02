@@ -9,7 +9,7 @@
 #       of the script you want to run in $1
 #       like so: ./run.sh src/in.eqilibration [--gpu]
 
-NPROCS=6
+NPROCS=2
 
 if [[ " $* " == *" --gpu "* ]]; then
 	echo "running mpirun with gpu util..."
