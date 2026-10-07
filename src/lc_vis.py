@@ -1,3 +1,5 @@
+# TODO: include final time in the plot
+
 import os
 
 from argparse import ArgumentParser
@@ -21,6 +23,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='TODO :)')
 
     parser.add_argument('-i', '--input', type=str, help='relative path to the input csv file')
+    parser.add_argument('-s', '--save', type=bool, help='save to png (true) or show immediately (false)')
 
     args = parser.parse_args()
 
@@ -42,4 +45,9 @@ if __name__ == '__main__':
     plt.grid(True, linestyle='--', alpha=0.5)
 
     plt.tight_layout()
-    plt.show()
+
+    if args.save:
+        # NOTE: please do not use ".csv" in file name, i don't want to make it harder :)
+        plt.savefig(str(args.input).replace('.csv', '.png'))
+    else:
+        plt.show()

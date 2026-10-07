@@ -16,40 +16,13 @@ if os.getcwd().endswith('src'): os.chdir('..')
 INPUT_DIR = Path('dumps/equilibrations')
 OUTPUT_DIR = Path('results/lc')
 
-RADIUS_DIV = 40 # how many different radiuses is compared
+RADIUS_DIV = 40 # how many different radiuses are compared
 RADIUS_MIN = 20 # minimal radius, [Ang]
+RADIUS_STEP = 5 # adding this to radius every iteration, [Ang]
 
 
-if __name__ == '__main__':
-
-    """
-    STEP 0: parse script arguments
-
-    getting input (dump) and output (csv) file names
-    """
-
-    parser = ArgumentParser(description='OVITO local solute saturation concentration in Cottrell atmospheres analysis.')
-
-    parser.add_argument('-i', '--input', type=Path, help='relative path to the input LAMMPS dump file')
-    parser.add_argument('-o', '--output', type=Path, help=f'output csv file name (filename only, without extension). Will be saved at ./{OUTPUT_DIR}')
-
-    args = parser.parse_args()
-
-    if not args.input:
-        # get latest file in the directory
-        args.input = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
-        print(f'Input file name was not provided, using latest dump file: {args.input}')
-
-    if not args.output:
-        # create directory for calculation results if it doesn't exist and save output there
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        args.output = OUTPUT_DIR / Path(args.input.name).with_suffix('.csv')
-
-    # rename with a number ("file_(n).csv") if file exists
-    counter = 1
-    while args.output.exists():
-        args.output = args.output.with_name(args.output.stem.replace(f'_({counter - 1})', '') + f'_({counter}){args.output.suffix}')
-        counter += 1
+def process_dump(dumpname) -> dict[float, float]:
+    start_time = time.time()
 
     """
     STEP 1: modifiers configuration
@@ -57,13 +30,11 @@ if __name__ == '__main__':
     finding the dislocation and preparing the selection around it
     """
 
-    start_time = time.time()
-
-    print(f'Importing file: {args.input}')
+    print(f'Importing file: {dumpname}')
 
     # import file
     # LAMMPS dump columns: id type x y z
-    pipeline = import_file(args.input, columns=[
+    pipeline = import_file(dumpname, columns=[
         'Particle Identifier', 'Particle Type',
         'Position.X', 'Position.Y', 'Position.Z'
     ])
@@ -114,42 +85,127 @@ if __name__ == '__main__':
         ( core_x**2       + (h - core_y)**2 ) ** 0.5,
         ( (w - core_x)**2 + core_y**2       ) ** 0.5,
         ( (w - core_x)**2 + (h - core_y)**2 ) ** 0.5
-    ])
-    r_mult = r_max - RADIUS_MIN
+    ]) // RADIUS_STEP * RADIUS_STEP
+
+    r = RADIUS_MIN
+
+    expr_part = f'(Position.X - {core_x})^2 + (Position.Y - {core_y})^2'
 
     # removing dxa from the pipeline as we don't need it no more
     pipeline.modifiers.remove(dxa_mod)
 
-    expr_part = f'(Position.X - {core_x})^2 + (Position.Y - {core_y})^2'
-
     print()
     print(f'Dislocation\'s core coordinates: ({core_x:.2f}, {core_y:.2f}).')
-    print(f'Computing c_Mg for {RADIUS_DIV} radiuses ranging linearly from {RADIUS_MIN:.2f} to {r_max:.2f}.')
+    # print(f'Computing c_Mg for {RADIUS_DIV} radiuses ranging linearly from {RADIUS_MIN:.2f} to {r_max:.2f}.')
     print(f'Using expression: {expr_part} < r^2. (variable "r")')
     print()
 
-    with open(args.output, mode='w', newline='') as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow(['r', 'c'])
+    res = {}
 
-        for i in range(0, RADIUS_DIV + 1):
-            r = r_mult * (i / RADIUS_DIV) + RADIUS_MIN
+    while r <= r_max:
 
-            # TODO: perhaps there are better ways to do this stuff
+        # TODO: perhaps there are better ways to do this stuff
 
-            expr = f'{expr_part} < {r}^2'
+        expr = f'{expr_part} < {r}^2'
 
-            sel_mod.expression = f'{expr} && ParticleType == 2'
-            data = pipeline.compute(last_frame)
-            N_mg = np.sum(data.particles['Selection'])
+        sel_mod.expression = f'{expr} && ParticleType == 2'
+        data = pipeline.compute(last_frame)
+        N_mg = np.sum(data.particles['Selection'])
 
-            sel_mod.expression = expr
-            data = pipeline.compute(last_frame)
-            N = np.sum(data.particles['Selection'])
+        sel_mod.expression = expr
+        data = pipeline.compute(last_frame)
+        N = np.sum(data.particles['Selection'])
 
-            c = N_mg / N
+        c = N_mg / N
+        r += RADIUS_STEP
 
-            print(f'c({r:.4f})\t= {c:.4f}')
-            writer.writerow([r, c])
+        print(f'c({r:.2f})\t= {c:.4f}')
+        res[r] = c
 
-    print(f'\nOutput file: {args.output}')
+    return res
+
+
+if __name__ == '__main__':
+
+    """
+    STEP 0: parse script arguments
+
+    getting input (dump) and output (csv) file names
+    """
+
+    parser = ArgumentParser(description='OVITO local solute saturation concentration in Cottrell atmospheres analysis.')
+
+    parser.add_argument('-i', '--input', type=Path, help='relative path to the input LAMMPS dump file')
+    parser.add_argument('-o', '--output', type=Path, help=f'output csv file name (filename only, without extension). Will be saved at ./{OUTPUT_DIR}')
+    parser.add_argument('-v', '--vacancies', type=float, help='fraction of vacancies (not %%) for averaging')
+    parser.add_argument('-t', '--temperature', type=int, help='temperature for averaging')
+
+    args = parser.parse_args()
+
+    parameters = [args.vacancies, args.temperature]
+    print(parameters)
+
+    # error!
+    if not all(list(map(lambda x: x != None, parameters))) and any(parameters):
+        raise Exception('You specified only one parameter, both are needed.')
+
+    # default mode
+    if not any(parameters):
+        if not args.input:
+            # get latest file in the directory
+            args.input = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
+            print(f'Input file name was not provided, using latest dump file: {args.input}')
+
+        if not args.output:
+            # create directory for calculation results if it doesn't exist and save output there
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            args.output = OUTPUT_DIR / Path(args.input.name).with_suffix('.csv')
+
+        # rename with a number ("file_(n).csv") if file exists
+        counter = 1
+        while args.output.exists():
+            args.output = args.output.with_name(args.output.stem.replace(f'_({counter - 1})', '') + f'_({counter}){args.output.suffix}')
+            counter += 1
+
+        with open(args.output, "w", newline="") as csv_file:
+            data = process_dump(str(args.input))
+
+            writer = csv.writer(csv_file)
+            writer.writerow(['r', 'c'])
+            writer.writerows(data.items())
+
+        print(f'\nOutput file: {args.output}')
+
+    # averaging mode (we don't really need this check here, but i like it like this)
+    if all(list(map(lambda x: x != None, parameters))):
+        if not args.output:
+            # create directory for calculation results if it doesn't exist and save output there
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            args.output = OUTPUT_DIR / Path(f'{(args.vacancies * 100.0):g}vac{int(args.temperature)}temp.csv')
+
+        # rename with a number ("file_(n).csv") if file exists
+        counter = 1
+        while args.output.exists():
+            args.output = args.output.with_name(args.output.stem.replace(f'_({counter - 1})', '') + f'_({counter}){args.output.suffix}')
+            counter += 1
+
+        all_data = {}
+
+        for dumpfile in INPUT_DIR.glob(f'*{(args.vacancies * 100.0):g}vac_{int(args.temperature)}temp*'):
+            for k, v in process_dump(dumpfile).items():
+                if k in all_data.keys():
+                    all_data[k].append(v)
+                else:
+                    all_data[k] = [v]
+
+        for k, v in all_data.items():
+            all_data[k] = sum(all_data[k]) / len(all_data[k])
+
+        with open(args.output, "w", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(['r', 'c'])
+            writer.writerows(all_data.items())
+
+        print(all_data)
+
+        print(f'\nOutput file: {args.output}')
