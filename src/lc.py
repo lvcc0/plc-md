@@ -16,7 +16,6 @@ if os.getcwd().endswith('src'): os.chdir('..')
 INPUT_DIR = Path('dumps/equilibrations')
 OUTPUT_DIR = Path('results/lc')
 
-RADIUS_DIV = 40 # how many different radiuses are compared
 RADIUS_MIN = 20 # minimal radius, [Ang]
 RADIUS_STEP = 5 # adding this to radius every iteration, [Ang]
 
@@ -67,6 +66,9 @@ def process_dump(dumpname) -> dict[float, float]:
     last_frame = pipeline.num_frames - 1
     data = pipeline.compute(last_frame)
 
+    # removing dxa from the pipeline as we don't need it no more
+    pipeline.modifiers.remove(dxa_mod)
+
     # NOTE: we assume there actually is a dislocation in the file provided :)
 
     # coordinates of the dislocation's core
@@ -75,54 +77,54 @@ def process_dump(dumpname) -> dict[float, float]:
     core_x = np.mean(positions[:, 0])
     core_y = np.mean(positions[:, 1])
 
-    w = data.cell[0, 0] # length in X direction
-    h = data.cell[1, 1] # length in Y direction
+    w = data.cell[0, 0] # cell size in X direction
+    h = data.cell[1, 1] # cell size in Y direction
 
     # finding max distance from dislocation's core to cell's edges
-    # => all atoms in the cell will be inside the cylinder with radius r_max
-    r_max = np.max([
+    # => (almost) all atoms in the cell will be inside the cylinder with radius r_max
+    RADIUS_MAX = np.max([
         ( core_x**2       + core_y**2       ) ** 0.5,
         ( core_x**2       + (h - core_y)**2 ) ** 0.5,
         ( (w - core_x)**2 + core_y**2       ) ** 0.5,
         ( (w - core_x)**2 + (h - core_y)**2 ) ** 0.5
     ]) // RADIUS_STEP * RADIUS_STEP
 
+    EXPR_LEFT = f'(Position.X - {core_x})^2 + (Position.Y - {core_y})^2'
+    
     r = RADIUS_MIN
-
-    expr_part = f'(Position.X - {core_x})^2 + (Position.Y - {core_y})^2'
-
-    # removing dxa from the pipeline as we don't need it no more
-    pipeline.modifiers.remove(dxa_mod)
-
+    out = {}
+    
     print()
     print(f'Dislocation\'s core coordinates: ({core_x:.2f}, {core_y:.2f}).')
-    # print(f'Computing c_Mg for {RADIUS_DIV} radiuses ranging linearly from {RADIUS_MIN:.2f} to {r_max:.2f}.')
-    print(f'Using expression: {expr_part} < r^2. (variable "r")')
+    print(f'Computing c_Mg for radiuses ranging from {RADIUS_MIN:.2f} to {RADIUS_MAX:.2f} stepping {RADIUS_STEP:.2f} per calculation.')
+    print(f'Using expression: {EXPR_LEFT} < r^2. (variable "r")')
     print()
 
-    res = {}
-
-    while r <= r_max:
+    while r <= RADIUS_MAX:
 
         # TODO: perhaps there are better ways to do this stuff
 
-        expr = f'{expr_part} < {r}^2'
+        expr = f'{EXPR_LEFT} < {r}^2'
 
-        sel_mod.expression = f'{expr} && ParticleType == 2'
+        # selecting and counting Mg atoms
+        sel_mod.expression = expr + ' && ParticleType == 2'
         data = pipeline.compute(last_frame)
         N_mg = np.sum(data.particles['Selection'])
 
+        # selecting and counting all atoms
         sel_mod.expression = expr
         data = pipeline.compute(last_frame)
         N = np.sum(data.particles['Selection'])
 
+        # calculating and saving Mg concentration
         c = N_mg / N
-        r += RADIUS_STEP
+        out[r] = c
 
+        # don't forget to iterate
         print(f'c({r:.2f})\t= {c:.4f}')
-        res[r] = c
-
-    return res
+        r += RADIUS_STEP
+    
+    return out
 
 
 if __name__ == '__main__':
@@ -131,6 +133,7 @@ if __name__ == '__main__':
     STEP 0: parse script arguments
 
     getting input (dump) and output (csv) file names
+    NOTE: other steps are in the process_dump function
     """
 
     parser = ArgumentParser(description='OVITO local solute saturation concentration in Cottrell atmospheres analysis.')
@@ -142,15 +145,48 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # enabling averaging mode if all paramenets are given
     parameters = [args.vacancies, args.temperature]
-    print(parameters)
+    all_parameters_specified = all(list(map (lambda x: x is not None, parameters)))
 
     # error!
-    if not all(list(map(lambda x: x != None, parameters))) and any(parameters):
+    if not all_parameters_specified and any(parameters):
         raise Exception('You specified only one parameter, both are needed.')
 
+    # averaging mode
+    if all_parameters_specified:
+        param_str = f'{(args.vacancies * 100.0):g}vac_{int(args.temperature)}temp'
+
+        if not args.output:
+            # create directory for calculation results if it doesn't exist and save output there
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+            args.output = OUTPUT_DIR / Path(param_str + '.csv')
+
+        # rename with a number ("file_(n).csv") if file exists
+        counter = 1
+        while args.output.exists():
+            args.output = args.output.with_name(args.output.stem.replace(f'_({counter - 1})', '') + f'_({counter}){args.output.suffix}')
+            counter += 1
+
+        all_data = {}
+
+        for dumpfile in INPUT_DIR.glob(f'*{param_str}*'):
+            for r, c in process_dump(dumpfile).items():
+                if r in all_data.keys():
+                    all_data[r].append(c)
+                else:
+                    all_data[r] = [c]
+
+        for r in all_data.keys():
+            all_data[r] = sum(all_data[r]) / len(all_data[r])
+
+        with open(args.output, "w", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            writer.writerow(['r', 'c'])
+            writer.writerows(all_data.items())
+
     # default mode
-    if not any(parameters):
+    else:
         if not args.input:
             # get latest file in the directory
             args.input = max(filter(lambda x: x.is_file(), INPUT_DIR.iterdir()), key=lambda x: x.stat().st_mtime)
@@ -174,38 +210,4 @@ if __name__ == '__main__':
             writer.writerow(['r', 'c'])
             writer.writerows(data.items())
 
-        print(f'\nOutput file: {args.output}')
-
-    # averaging mode (we don't really need this check here, but i like it like this)
-    if all(list(map(lambda x: x != None, parameters))):
-        if not args.output:
-            # create directory for calculation results if it doesn't exist and save output there
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            args.output = OUTPUT_DIR / Path(f'{(args.vacancies * 100.0):g}vac{int(args.temperature)}temp.csv')
-
-        # rename with a number ("file_(n).csv") if file exists
-        counter = 1
-        while args.output.exists():
-            args.output = args.output.with_name(args.output.stem.replace(f'_({counter - 1})', '') + f'_({counter}){args.output.suffix}')
-            counter += 1
-
-        all_data = {}
-
-        for dumpfile in INPUT_DIR.glob(f'*{(args.vacancies * 100.0):g}vac_{int(args.temperature)}temp*'):
-            for k, v in process_dump(dumpfile).items():
-                if k in all_data.keys():
-                    all_data[k].append(v)
-                else:
-                    all_data[k] = [v]
-
-        for k, v in all_data.items():
-            all_data[k] = sum(all_data[k]) / len(all_data[k])
-
-        with open(args.output, "w", newline="") as csv_file:
-            writer = csv.writer(csv_file)
-            writer.writerow(['r', 'c'])
-            writer.writerows(all_data.items())
-
-        print(all_data)
-
-        print(f'\nOutput file: {args.output}')
+    print(f'\nOutput file: {args.output}')

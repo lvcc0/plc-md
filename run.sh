@@ -1,15 +1,26 @@
 #!/usr/bin/bash
 
-# NOTE: check for OMP_NUM_THREADS env var!
-#       more often than not it should be 2:
-#
-#export OMP_NUM_THREADS=2
-
 # NOTE: this script is dumb so please put the name
 #       of the script you want to run in $1
-#       like so: ./run.sh src/in.eqilibration [--gpu]
+#       like so: ./run.sh src/in.equilibration [--gpu]
 
-NPROCS=2
+
+# !! set this variable to cores available !! #
+NPROC=0
+
+
+if [ -z $OMP_NUM_THREADS ]; then
+    OMP_NUM_THREADS=1
+    echo "OMP_NUM_THREADS env var is not set, defaulting to 1 thread"
+fi
+
+if [ $NPROC -eq 0 ]; then
+    NPROC=$(nproc)
+    echo "NPROC var is not set, defaulting to $NPROC cores"
+    echo "please, set NPROC var in the \"run.sh\" script"
+fi
+
+echo "using $NPROC cores, $OMP_NUM_THREADS omp threads"
 
 file="$1"
 shift
@@ -24,10 +35,10 @@ for arg in "$@"; do
 done
 
 if [[ " $* " == *" --gpu "* ]]; then
-	echo "running mpirun with gpu util..."
-    mpirun -np $NPROCS --bind-to core --map-by core lmp -sf gpu -pk gpu 1 -in "$file" "${args[@]}"
-	exit 0
+    echo "running mpirun with gpu util..."
+    mpirun -np $NPROC --bind-to core --map-by core lmp -sf gpu -pk gpu 1 -in "$file" "${args[@]}"
+    exit 0
 fi
 
 echo "running mpirun with cpu util only..."
-mpirun -np $NPROCS --bind-to core --map-by core lmp -sf omp -in "$file" "${args[@]}"
+mpirun -np $NPROC --bind-to core --map-by core lmp -sf omp -in "$file" "${args[@]}"
