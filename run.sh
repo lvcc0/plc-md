@@ -8,49 +8,71 @@
 file="$1"
 shift
 
-# parsing arguments
+args=()
+
+# parsing arguments:
+# $np - number of MPI ranks used (gpu package doesn't mean gpu util only!)
+# $omp - number of OpenMP threads per MPI rank
+# $gpu - number of GPUs to use (disables omp pk, enables gpu pk)
 while (($#)); do
     case "$1" in
-    -np)
-        if (($# < 2)); then
-            echo "missing value for -np" >&2
-            exit 1
-        fi
-        np=$2
-        shift 2
-        ;;
-    --gpu)
-        gpu=true
-        shift
-        ;;
-    *)
-        echo "unknown argument: $1" >&2
-        exit 1
-        ;;
+        -np)
+            np=$2
+            shift 2
+            ;;
+        -omp)
+            omp=$2
+            shift 2
+            ;;
+        -gpu)
+            gpu=$2
+            shift 2
+            ;;
+        *)
+            args+=("$1")
+            shift
+            ;;
     esac
 done
 
-if [[ -z $OMP_NUM_THREADS ]]; then
-    OMP_NUM_THREADS=1
-    echo "OMP_NUM_THREADS env var is not set, defaulting to 1 thread"
-fi
-
 if [[ -z $np ]]; then
     np=$(nproc)
-    echo "defaulting to $np cores. you can provide number of cores using \"-np\" arg"
+    echo "defaulting to $np MPI ranks. you can provide number of MPI ranks using \"-np\" arg"
 fi
 
-##################
-# ACTUAL RUNNING #
-##################
+if [[ -z $omp ]]; then
+    if [[ -z $OMP_NUM_THREADS ]]; then
+        echo "OMP_NUM_THREADS env var is not set, defaulting to 1 thread"
+        omp=1
+    else
+        omp=$OMP_NUM_THREADS
+    fi
+fi
 
-echo "using $np cores, $OMP_NUM_THREADS omp threads"
+echo "using $np MPI ranks x $omp OpenMP threads"
 
-if [[ $gpu == true ]]; then
-    echo "running mpirun with gpu util..."
-    mpirun -np $np --bind-to core --map-by core lmp -sf gpu -pk gpu 1 -in "$file" "$@"
+###                                   ###
+# RUNNING WITH GPU PACKAGE AND SUFFIXES #
+###                                   ###
+
+if [[ ${gpu:-} -ne 0 ]]; then
+    echo "running mpirun with $gpu GPU(s)..."
+
+    OMP_NUM_THREADS=$omp \
+    OMP_PLACES=cores \
+    OMP_PROC_BIND=close \
+    mpirun -np $np --bind-to core --map-by core lmp -sf gpu -pk gpu $gpu omp $omp -in "$file" "${args[@]}"
+
     exit 0
 fi
 
-echo "running mpirun with cpu util only..."
-mpirun -np $NPROC --bind-to core --map-by core lmp -sf omp -in "$file" "$@"
+###                                   ###
+# RUNNING WITH OMP PACKAGE AND SUFFIXES #
+###                                   ###
+
+echo "running mpirun with CPU util only..."
+
+OMP_NUM_THREADS=$omp \
+OMP_PLACES=cores \
+OMP_PROC_BIND=close \
+mpirun -np $np --bind-to core --map-by core lmp -sf omp -pk omp $omp -in "$file" "${args[@]}"
