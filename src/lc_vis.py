@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='TODO :)')
 
     parser.add_argument('-i', '--input', type=str, help='relative path to the input csv file')
-    parser.add_argument('-s', '--save', type=bool, help='save to png (true) or show immediately (false)')
+    parser.add_argument('-s', '--save', action='store_true', type=bool, help='save to png (true) or show immediately (false)')
 
     args = parser.parse_args()
 
