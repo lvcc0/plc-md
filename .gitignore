@@ -14,4 +14,4 @@ venv/
 *.ovito
 atoms.*
 
-benchmark-summary.txt
+benchmark_*
