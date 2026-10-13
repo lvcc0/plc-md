@@ -1,0 +1,78 @@
+include src/common.ini
+
+# ---                --- #
+# --- initial config --- #
+# ---                --- #
+
+# defaulting file_name
+include src/include/file_name.lmp
+
+# logging results
+log logs/minimizations/${file_name}.log
+shell rm log.lammps
+
+# defaulting atom_file
+include src/include/atom_file.lmp
+
+# reading initial atomic structure data
+read_data ${atom_file}
+print "reading data from ${atom_file}"
+
+# setting seed for random commands
+include src/include/seed.lmp
+
+# ---                      --- #
+# --- system configuration --- #
+# ---                      --- #
+
+# NOTE: this system config must be done after getting initial atomic structure,
+#       hence it is here and not in the common.ini
+
+mass 1 ${al_mass}
+mass 2 ${mg_mass}
+
+pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
+pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
+
+thermo       ${min_dump_freq}
+thermo_style custom step temp pe fnorm fmax press lx ly lz
+
+dump 1 all custom ${min_dump_freq}         &
+     dumps/minimizations/${file_name}.atom &
+     id type x y z
+
+# ---                     --- #
+# --- energy minimization --- #
+# ---                     --- #
+
+# current algorithm:
+# 1. get initial atomic structure, minimize
+# 2. replace some Al atoms with mg atoms, minimize
+# 3. delete some Al atoms (create vacancies), minimize
+# 4. final minimization using more strict style
+
+# (1)
+
+min_style fire
+min_modify dmax 0.005
+minimize 0.0 1.0e-4 10000 100000
+
+# (2)
+
+set type 1 type/fraction 2 ${mg_frac} ${seed}
+minimize 0.0 1.0e-4 10000 100000
+
+# (3)
+
+group al_group type 1
+delete_atoms random fraction ${vac_frac} yes al_group NULL ${seed}
+reset_atoms id
+minimize 0.0 1.0e-4 10000 100000
+
+# (4)
+
+min_style cg
+minimize 0.0 1.0e-8 10000 100000
+
+# save minimization results in a form of a restart file
+write_restart restarts/minimizations/${file_name}.restart

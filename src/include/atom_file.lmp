@@ -1,0 +1,5 @@
+# if atom file name is not given, get the last modified one
+if "$(is_defined(variable, atom_file) == 0)" then &
+  "shell ls -t atoms.* | head -1 > atom_file.tmp" &
+  "variable atom_file file atom_file.tmp"         &
+  "shell rm atom_file.tmp"

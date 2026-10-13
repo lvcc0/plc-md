@@ -2,7 +2,7 @@
 
 # NOTE: this script is dumb so please put the name
 #       of the script you want to run in $1
-#       like so: ./run.sh src/in.equilibration [-np N] [-omp N] [-gpu N] [...]
+#       like so: ./run.sh src/in.segregation [-np N] [-omp N] [-gpu N] [...]
 
 # first argument is always the input file
 file="$1"
@@ -12,7 +12,7 @@ args=()
 
 while (($#)); do
     case "$1" in
-        # number of MPI ranks used (gpu package doesn't mean gpu util only!) 
+        # number of MPI ranks used (gpu package doesn't mean gpu util only!)
         -np)
             np=$2
             shift 2
@@ -22,7 +22,7 @@ while (($#)); do
             omp=$2
             shift 2
             ;;
-        # number of GPUs to use (does not disable omp package) 
+        # number of GPUs to use (does not disable omp package)
         -gpu)
             gpu=$2
             shift 2

@@ -1,0 +1,11 @@
+# default values (used if values below are not uncommented)
+#neighbor 2.0 bin
+#neigh_modify delay 0 every 1 check yes
+
+# performance tuned
+#neighbor 2.0 bin
+#neigh_modify delay 10 every 2 check yes
+
+# stability tuned (set if "Dangerous builds" != 0)
+#neighbor 3.0 bin
+#neigh_modify delay 0 every 1 check yes

@@ -1,0 +1,6 @@
+# getting datetime data for naming files
+if "$(is_defined(variable, file_name) == 0)" then &
+  "shell date +%Y-%m-%d_%H-%M > timestamp.tmp"    &
+  "variable timestamp file timestamp.tmp"         &
+  "shell rm timestamp.tmp"                        &
+  "variable file_name string equilibration.${timestamp}"

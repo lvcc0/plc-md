@@ -1,0 +1,82 @@
+include src/common.ini
+
+# ---                --- #
+# --- initial config --- #
+# ---                --- #
+
+# defaulting file_name
+include src/include/file_name.lmp
+
+# logging results
+log logs/segregations/${file_name}.log
+shell rm log.lammps
+
+# defaulting atom_file
+include src/include/atom_file.lmp
+
+# reading initial atomic structure data
+read_data ${atom_file}
+print "reading data from ${atom_file}"
+
+# setting seed for random commands
+include src/include/seed.lmp
+
+# ---                      --- #
+# --- system configuration --- #
+# ---                      --- #
+
+mass 1 ${al_mass}
+mass 2 ${mg_mass}
+
+pair_style eam/fs                      # Finnis-Sinclair format Embedded Atom Method
+pair_coeff * * ${potential_almg} Al Mg # 1-1, 1-2, 2-2, where 1=Al, 2=Mg (because the potential file is made this way)
+
+thermo        ${seg_dump_freq}
+thermo_style  custom step temp pe fnorm fmax press lx ly lz
+
+dump 1 all custom ${seg_dump_freq}        &
+     dumps/segregations/${file_name}.atom &
+     id type x y z
+
+# ---                      --- #
+# --- system equilibration --- #
+# ---                      --- #
+
+timestep ${seg_run_timestep}
+
+# set initial atom velocities
+velocity all create ${desired_temp} ${seed} units box dist gaussian loop all mom yes rot yes
+
+fix EQ all nvt temp ${desired_temp} ${desired_temp} 0.5
+
+print "###             ###"
+print "## equilibration ##"
+print "###             ###"
+
+variable eq_run_steps_int equal round(${eq_run_steps})
+run $(v_eq_run_steps_int)
+
+unfix EQ
+
+# NOTE: perhaps i can skip unfixing/fixing the nvt fix and rock with it till the end
+
+# ---                   --- #
+# --- MC/MD segregation --- #
+# ---                   --- #
+
+fix MD all nvt temp ${desired_temp} ${desired_temp} 0.5
+fix MC all atom/swap 100 20 ${seed} ${desired_temp} types 1 2 ke yes
+
+print "###                  ###"
+print "## Mg segregation run ##"
+print "###                  ###"
+
+variable seg_run_steps_int equal round(${seg_run_steps})
+run $(v_seg_run_steps_int)
+
+unfix MD
+unfix MC
+unfix TOPFIX
+unfix BOTFIX
+
+write_restart restarts/segregations/${file_name}.restart

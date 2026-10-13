@@ -10,7 +10,7 @@
 #       how many physical CPU cores are available
 
 STEPS=3000
-TEST_FILE=src/in.equilibration
+TEST_FILE=src/in.segregation
 
 # parsing arguments
 while (($#)); do
@@ -51,16 +51,16 @@ summary="benchmark_${mode}_$(date +%d-%m-%y_%H-%M).log"
 if [[ "$mode" == "cpu" ]]; then
     echo "=== benchmarking using CPU only ===" > "$summary"
 else
-    echo "=== benchmarking using $gpu GPU(s) ===" > $"summary"
+    echo "=== benchmarking using $gpu GPU(s) ===" > "$summary"
 fi
 
 for ((np = 1; np <= $ranks; np++)); do
     omp=$(( ranks / np ))
     file_name="bm.${mode}.${np}x${omp}"
 
-    log_name=logs/equilibrations/"$file_name".log
-    dump_name=dumps/equilibrations/"$file_name".atom
-    restart_name=restarts/equilibrations/"$file_name".restart
+    log_name=logs/segregations/"$file_name".log
+    dump_name=dumps/segregations/"$file_name".atom
+    restart_name=restarts/segregations/"$file_name".restart
 
     # actually running lammps
     if [[ "$mode" == "cpu" ]]; then

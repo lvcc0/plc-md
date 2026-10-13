@@ -1,0 +1,8 @@
+# uncomment to enable set number seed (debugging purposes)
+#variable seed equal 1337
+
+# getting time-based random seed to use in production runs
+if "$(is_defined(variable, seed) == 0)" then &
+  "shell sh src/seed.sh > seed.tmp"          &
+  "variable seed file seed.tmp"              &
+  "shell rm seed.tmp"
