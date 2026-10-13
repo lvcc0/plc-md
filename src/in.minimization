@@ -41,6 +41,8 @@ dump 1 all custom ${min_dump_freq}         &
      dumps/minimizations/${file_name}.atom &
      id type x y z
 
+include src/include/neighbor.lmp
+
 # ---                     --- #
 # --- energy minimization --- #
 # ---                     --- #

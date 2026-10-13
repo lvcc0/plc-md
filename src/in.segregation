@@ -4,6 +4,8 @@ include src/common.ini
 # --- initial config --- #
 # ---                --- #
 
+# TODO: open a restart file, not atom_file
+
 # defaulting file_name
 include src/include/file_name.lmp
 
@@ -12,11 +14,11 @@ log logs/segregations/${file_name}.log
 shell rm log.lammps
 
 # defaulting atom_file
-include src/include/atom_file.lmp
+include src/include/restart_file.lmp
 
-# reading initial atomic structure data
-read_data ${atom_file}
-print "reading data from ${atom_file}"
+# reading minimized atomic data from a restart file
+read_restart ${restart_file}
+print "reading data from ${restart_file}"
 
 # setting seed for random commands
 include src/include/seed.lmp
@@ -38,6 +40,8 @@ dump 1 all custom ${seg_dump_freq}        &
      dumps/segregations/${file_name}.atom &
      id type x y z
 
+include src/include/neighbor.lmp
+
 # ---                      --- #
 # --- system equilibration --- #
 # ---                      --- #
@@ -47,7 +51,7 @@ timestep ${seg_run_timestep}
 # set initial atom velocities
 velocity all create ${desired_temp} ${seed} units box dist gaussian loop all mom yes rot yes
 
-fix EQ all nvt temp ${desired_temp} ${desired_temp} 0.5
+fix MD all nvt temp ${desired_temp} ${desired_temp} 0.5
 
 print "###             ###"
 print "## equilibration ##"
@@ -56,16 +60,13 @@ print "###             ###"
 variable eq_run_steps_int equal round(${eq_run_steps})
 run $(v_eq_run_steps_int)
 
-unfix EQ
-
-# NOTE: perhaps i can skip unfixing/fixing the nvt fix and rock with it till the end
-
 # ---                   --- #
 # --- MC/MD segregation --- #
 # ---                   --- #
 
-fix MD all nvt temp ${desired_temp} ${desired_temp} 0.5
-fix MC all atom/swap 100 20 ${seed} ${desired_temp} types 1 2 ke yes
+variable swap_n_int equal round(${swap_n})
+variable swap_x_int equal round(${swap_x})
+fix MC all atom/swap $(v_swap_n_int) $(v_swap_x_int) ${seed} ${desired_temp} types 1 2 ke yes
 
 print "###                  ###"
 print "## Mg segregation run ##"

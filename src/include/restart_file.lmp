@@ -1,0 +1,5 @@
+# if restart file name is not given, get the last modified one
+if "$(is_defined(variable, restart_file) == 0)" then                &
+  "shell ls -t restarts/minimizations | head -1 > restart_file.tmp" &
+  "variable restart_file file restart_file.tmp"                     &
+  "shell rm restart_file.tmp"
